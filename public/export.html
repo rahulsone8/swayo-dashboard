@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Data Explorer — Food Analytics</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#12151f;font-family:'Segoe UI',system-ui,sans-serif;color:#d4dff0;min-height:100vh}
+
+/* ── TOP BAR ── */
+.topbar{background:#0a0d17;border-bottom:2px solid #1e2540;padding:0 20px;height:52px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100}
+.topbar .brand{font-size:15px;font-weight:800;color:#fff}.brand span{color:#5b9cf6}
+.back-btn{background:#1e2a42;border:1px solid #263050;color:#7090c0;padding:5px 12px;border-radius:6px;font-size:11px;cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:5px}
+.back-btn:hover{border-color:#5b9cf6;color:#5b9cf6}
+.topbar-r{margin-left:auto;font-size:10px;color:#3d5070}
+
+/* ── LAYOUT ── */
+.main{display:grid;grid-template-columns:300px 1fr;min-height:calc(100vh - 52px)}
+@media(max-width:900px){.main{grid-template-columns:1fr}}
+
+/* ── FILTER PANEL ── */
+.panel{background:#0d1221;border-right:1px solid #1e2540;padding:20px;display:flex;flex-direction:column;gap:0;overflow-y:auto;max-height:calc(100vh - 52px);position:sticky;top:52px}
+.panel-title{font-size:13px;font-weight:700;color:#d4dff0;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.section{margin-bottom:18px}
+.section-label{font-size:10px;font-weight:700;color:#3d5070;text-transform:uppercase;letter-spacing:.9px;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid #1a2235}
+.field{margin-bottom:10px}
+.field label{display:block;font-size:10px;color:#4d6080;margin-bottom:4px;letter-spacing:.5px}
+.fsel,.finput{width:100%;background:#18213a;border:1px solid #263050;color:#b8c8e0;padding:7px 10px;border-radius:7px;font-size:11.5px;outline:none}
+.fsel:focus,.finput:focus{border-color:#5b9cf6;background:#1a2640}
+.finput::placeholder{color:#3d5070}
+
+/* ── EXPORT TYPE TABS ── */
+.type-tabs{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:18px}
+.type-tab{background:#18213a;border:1px solid #263050;border-radius:8px;padding:10px 8px;text-align:center;cursor:pointer;transition:all .15s}
+.type-tab:hover{border-color:#5b9cf6}
+.type-tab.active{background:#1e3060;border-color:#5b9cf6}
+.type-tab .icon{font-size:18px;margin-bottom:3px}
+.type-tab .lbl{font-size:10px;color:#607090;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.type-tab.active .lbl{color:#5b9cf6}
+
+/* ── ACTION BUTTONS ── */
+.action-group{display:flex;flex-direction:column;gap:8px;margin-top:auto;padding-top:16px;border-top:1px solid #1e2540}
+.btn{border:none;border-radius:8px;padding:10px 14px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:all .15s;width:100%}
+.btn-preview{background:#1e3060;color:#5b9cf6;border:1px solid #2a4080}
+.btn-preview:hover{background:#243870;border-color:#5b9cf6}
+.btn-csv{background:#1a3a2a;color:#34d399;border:1px solid #234d35}
+.btn-csv:hover{background:#1f4530;border-color:#34d399}
+.btn-excel{background:#1e3a18;color:#86efac;border:1px solid #2a4d22}
+.btn-excel:hover{background:#234520;border-color:#86efac}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── RESULTS PANEL ── */
+.results{padding:20px;overflow:auto}
+.results-header{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.results-title{font-size:14px;font-weight:700;color:#d4dff0}
+.count-badge{background:#1e2a42;border:1px solid #263050;color:#607090;padding:3px 10px;border-radius:20px;font-size:11px}
+.count-badge.has-data{border-color:#5b9cf6;color:#5b9cf6}
+.warn-badge{background:rgba(251,146,60,.1);border:1px solid rgba(251,146,60,.3);color:#fb923c;padding:3px 10px;border-radius:20px;font-size:10px}
+
+/* ── PRESET QUICK-FILTERS ── */
+.presets{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px}
+.preset{background:#18213a;border:1px solid #263050;color:#607090;padding:5px 12px;border-radius:20px;font-size:10px;font-weight:700;cursor:pointer;transition:all .15s;white-space:nowrap}
+.preset:hover{border-color:#5b9cf6;color:#5b9cf6}
+
+/* ── EMPTY / ERROR STATES ── */
+.empty-state{text-align:center;padding:60px 20px;color:#3d5070}
+.empty-state .icon{font-size:40px;margin-bottom:12px}
+.empty-state p{font-size:13px;line-height:1.6}
+.error-state{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);border-radius:8px;padding:14px 16px;color:#f87171;font-size:12px;margin-bottom:14px;display:none}
+.error-state.show{display:block}
+
+/* ── DATA TABLE ── */
+.tbl-container{overflow:auto;border-radius:8px;border:1px solid #1e2540}
+table{width:100%;border-collapse:collapse;font-size:11.5px;white-space:nowrap}
+thead{position:sticky;top:0;z-index:10}
+th{background:#0d1221;padding:9px 12px;text-align:left;color:#3d5070;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.6px;border-bottom:2px solid #1e2540}
+td{padding:7px 12px;border-bottom:1px solid #131824;color:#9ab0cc}
+tr:hover td{background:#1a2438}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+td.contact{font-family:monospace;font-size:10.5px;letter-spacing:.5px}
+td.highlight{color:#34d399;font-weight:700}
+td.red{color:#f87171}
+td.orange{color:#fb923c}
+
+/* ── PILLS ── */
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
+.pg{background:rgba(52,211,153,.12);color:#34d399}
+.pb{background:rgba(91,156,246,.12);color:#5b9cf6}
+.po{background:rgba(251,146,60,.12);color:#fb923c}
+.pr{background:rgba(248,113,113,.12);color:#f87171}
+.pp{background:rgba(167,139,250,.12);color:#a78bfa}
+
+/* ── COLUMN VISIBILITY ── */
+.col-toggle{background:#18213a;border:1px solid #263050;color:#607090;padding:5px 10px;border-radius:6px;font-size:10px;cursor:pointer}
+.col-toggle:hover{border-color:#5b9cf6;color:#5b9cf6}
+.col-panel{background:#0d1221;border:1px solid #1e2540;border-radius:8px;padding:12px;margin-bottom:12px;display:none;flex-wrap:wrap;gap:8px}
+.col-panel.open{display:flex}
+.col-chk{display:flex;align-items:center;gap:5px;font-size:11px;color:#607090;cursor:pointer}
+.col-chk input{accent-color:#5b9cf6}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="brand">🍽 <span>Food</span> Analytics</div>
+  <a href="/" class="back-btn">← Back to Dashboard</a>
+  <div class="topbar-r" id="db-status">Connecting…</div>
+</div>
+
+<div class="main">
+
+  <!-- ═══ FILTER PANEL ═══════════════════════════════════════════════════════ -->
+  <div class="panel">
+    <div class="panel-title">🔍 Data Explorer</div>
+
+    <!-- Export type -->
+    <div class="section-label">What do you want to export?</div>
+    <div class="type-tabs">
+      <div class="type-tab active" data-type="orders" onclick="setType('orders',this)">
+        <div class="icon">📦</div><div class="lbl">Orders</div>
+      </div>
+      <div class="type-tab" data-type="customers" onclick="setType('customers',this)">
+        <div class="icon">👥</div><div class="lbl">Customers</div>
+      </div>
+      <div class="type-tab" data-type="items" onclick="setType('items',this)">
+        <div class="icon">🍱</div><div class="lbl">Items</div>
+      </div>
+      <div class="type-tab" data-type="funnel" onclick="setType('funnel',this)">
+        <div class="icon">🔄</div><div class="lbl">Funnel</div>
+      </div>
+    </div>
+
+    <!-- Date range -->
+    <div class="section">
+      <div class="section-label">Date Range</div>
+      <div class="field"><label>From</label><input type="date" id="f-from" class="finput"/></div>
+      <div class="field"><label>To</label><input type="date" id="f-to" class="finput"/></div>
+    </div>
+
+    <!-- Platform -->
+    <div class="section">
+      <div class="section-label">Platform</div>
+      <div class="field">
+        <select id="f-platform" class="fsel">
+          <option value="">All Platforms</option>
+          <option value="grabfood_whatsapp">GrabFood WhatsApp</option>
+          <option value="swayo_whatsapp">Swayo WhatsApp</option>
+          <option value="swayo_app">Swayo App (Jan 2026+)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Restaurant -->
+    <div class="section">
+      <div class="section-label">Restaurant</div>
+      <div class="field">
+        <select id="f-restaurant" class="fsel"><option value="">All Restaurants</option></select>
+      </div>
+    </div>
+
+    <!-- Order filters (shown for orders/items) -->
+    <div class="section" id="order-filters">
+      <div class="section-label">Order Filters</div>
+      <div class="field"><label>Order Status</label>
+        <select id="f-status" class="fsel">
+          <option value="">All Statuses</option>
+          <option value="Completed">Completed</option>
+          <option value="Cancelled">Cancelled</option>
+          <option value="Accepted">Accepted</option>
+          <option value="In-Progress">In-Progress</option>
+        </select>
+      </div>
+      <div class="field"><label>Coupon Used</label>
+        <select id="f-coupon" class="fsel">
+          <option value="">Any</option>
+          <option value="1">Yes — used coupon</option>
+          <option value="0">No — no coupon</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Customer filters -->
+    <div class="section" id="customer-filters">
+      <div class="section-label">Customer Filters</div>
+      <div class="field"><label>Segment</label>
+        <select id="f-segment" class="fsel">
+          <option value="">All Segments</option>
+          <option value="VIP">VIP (10+ orders)</option>
+          <option value="Loyal">Loyal (5–9 orders)</option>
+          <option value="Repeat">Repeat (2–4 orders)</option>
+          <option value="One-time">One-time (1 order)</option>
+        </select>
+      </div>
+      <div class="field"><label>Min Lifetime Orders</label>
+        <input type="number" id="f-min-orders" class="finput" placeholder="e.g. 1" min="1"/>
+      </div>
+      <div class="field"><label>Max Lifetime Orders</label>
+        <input type="number" id="f-max-orders" class="finput" placeholder="e.g. 5"/>
+      </div>
+    </div>
+
+    <!-- Product filter (shown for items) -->
+    <div class="section" id="product-filters" style="display:none">
+      <div class="section-label">Product Filter</div>
+      <div class="field"><label>Item name contains</label>
+        <input type="text" id="f-product" class="finput" placeholder="e.g. Shawarma"/>
+      </div>
+    </div>
+
+    <!-- Row limit -->
+    <div class="section">
+      <div class="section-label">Row Limit</div>
+      <div class="field">
+        <select id="f-limit" class="fsel">
+          <option value="500">500 rows</option>
+          <option value="1000">1,000 rows</option>
+          <option value="5000" selected>5,000 rows</option>
+          <option value="10000">10,000 rows</option>
+          <option value="50000">50,000 rows (max)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="action-group">
+      <button class="btn btn-preview" onclick="runPreview()" id="btn-preview">
+        <span>👁</span> Preview (200 rows)
+      </button>
+      <button class="btn btn-csv" onclick="runExport('csv')" id="btn-csv">
+        <span>📄</span> Download CSV
+      </button>
+      <button class="btn btn-excel" onclick="runExport('excel')" id="btn-excel">
+        <span>📊</span> Download Excel (.xls)
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══ RESULTS PANEL ════════════════════════════════════════════════════ -->
+  <div class="results">
+
+    <!-- Quick preset filters -->
+    <div style="margin-bottom:14px">
+      <div style="font-size:10px;color:#3d5070;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;font-weight:700">⚡ Quick Filters</div>
+      <div class="presets" id="preset-bar">
+        <!-- populated by JS based on export type -->
+      </div>
+    </div>
+
+    <div id="error-state" class="error-state"></div>
+
+    <div class="results-header">
+      <div class="results-title" id="results-title">Configure filters and click Preview</div>
+      <div class="count-badge" id="count-badge">0 rows</div>
+      <div class="warn-badge" id="warn-badge" style="display:none">⚠ Results capped at limit</div>
+      <button class="col-toggle" onclick="toggleColPanel()">⚙ Columns</button>
+    </div>
+
+    <div class="col-panel" id="col-panel"></div>
+
+    <div id="table-container">
+      <div class="empty-state">
+        <div class="icon">🔍</div>
+        <p>Use the filters on the left to query your data.<br/>
+        Click <strong>Preview</strong> to see results here,<br/>
+        then <strong>Download CSV or Excel</strong> to export.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+
+// ── UTILS ──────────────────────────────────────────────────────────────────
+const el   = id => document.getElementById(id);
+const html = (id,h) => el(id).innerHTML = h;
+const fmt  = n => (n==null||isNaN(n)) ? '—' : Number(n).toLocaleString('en-IN');
+const fmtR = n => n==null ? '—' : '₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:0});
+const fmtK = n => {
+  if(n==null||isNaN(n)) return '—'; n=Number(n);
+  return n>=100000 ? '₹'+(n/100000).toFixed(2)+'L' : n>=1000 ? '₹'+(n/1000).toFixed(1)+'K' : fmtR(n);
+};
+
+const PLAT  = { grabfood_whatsapp:'GrabFood WA', swayo_whatsapp:'Swayo WA', swayo_app:'Swayo App' };
+const PCOL  = { grabfood_whatsapp:'#34d399', swayo_whatsapp:'#fb923c', swayo_app:'#5b9cf6' };
+const SCOL  = { VIP:'pg', Loyal:'po', Repeat:'pb', 'One-time':'pp' };
+
+let currentType   = 'orders';
+let currentData   = [];
+let hiddenColumns = new Set();
+
+// ── PRESETS per export type ────────────────────────────────────────────────
+const PRESETS = {
+  orders: [
+    { label:'One-time customers',  f:{ f_segment:'One-time', f_min_orders:'1', f_max_orders:'1' }},
+    { label:'VIP customers',       f:{ f_segment:'VIP' }},
+    { label:'Cancelled orders',    f:{ f_status:'Cancelled' }},
+    { label:'Coupon users',        f:{ f_coupon:'1' }},
+    { label:'Swayo App only',      f:{ f_platform:'swayo_app' }},
+    { label:'GrabFood WA only',    f:{ f_platform:'grabfood_whatsapp' }},
+    { label:'Jan 2026 onwards',    f:{ f_from:'2026-01-01' }},
+    { label:'Jan 2025 onwards',    f:{ f_from:'2025-01-01' }},
+  ],
+  customers: [
+    { label:'One-time buyers',     f:{ f_segment:'One-time', f_min_orders:'1', f_max_orders:'1' }},
+    { label:'VIP (10+ orders)',    f:{ f_segment:'VIP' }},
+    { label:'Loyal (5–9)',         f:{ f_segment:'Loyal' }},
+    { label:'Repeat (2–4)',        f:{ f_segment:'Repeat' }},
+    { label:'High value only',     f:{ f_min_orders:'5' }},
+  ],
+  items: [
+    { label:'Shawarma items',      f:{ f_product:'shawarma' }},
+    { label:'Paneer items',        f:{ f_product:'paneer' }},
+    { label:'GrabFood items',      f:{ f_platform:'grabfood_whatsapp' }},
+    { label:'App items',           f:{ f_platform:'swayo_app' }},
+  ],
+  funnel: [
+    { label:'PDP views only',      f:{}},
+    { label:'Jan 2026+',           f:{ f_from:'2026-01-01' }},
+  ],
+};
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+async function init() {
+  // DB health
+  try {
+    await fetch(`${API}/api/health`);
+    el('db-status').textContent = '🟢 DB Connected';
+    el('db-status').style.color = '#34d399';
+  } catch(e) {
+    el('db-status').textContent = '🔴 DB Error';
+    el('db-status').style.color = '#f87171';
+  }
+
+  // Load date range
+  try {
+    const r = await fetch(`${API}/api/filters`);
+    const d = await r.json();
+    if (d.min_date) el('f-from').value = d.min_date;
+    if (d.max_date) el('f-to').value   = d.max_date;
+    const rs = el('f-restaurant');
+    (d.restaurants||[]).forEach(r => {
+      const o = document.createElement('option');
+      o.value = r.shop_id;
+      o.textContent = r.restaurant_name || r.shop_id;
+      rs.appendChild(o);
+    });
+  } catch(e) {}
+
+  renderPresets();
+}
+
+// ── EXPORT TYPE ────────────────────────────────────────────────────────────
+function setType(type, tab) {
+  currentType = type;
+  document.querySelectorAll('.type-tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+
+  // Show/hide relevant filter sections
+  el('order-filters').style.display    = ['orders','items'].includes(type) ? '' : 'none';
+  el('product-filters').style.display  = type === 'items' ? '' : 'none';
+  el('customer-filters').style.display = ['orders','customers'].includes(type) ? '' : 'none';
+
+  renderPresets();
+  html('table-container','<div class="empty-state"><div class="icon">🔍</div><p>Filters changed — click Preview to refresh.</p></div>');
+  el('count-badge').textContent = '0 rows';
+  el('count-badge').className   = 'count-badge';
+}
+
+// ── PRESETS ────────────────────────────────────────────────────────────────
+function renderPresets() {
+  const list = PRESETS[currentType] || [];
+  html('preset-bar', list.map(p =>
+    `<div class="preset" onclick='applyPreset(${JSON.stringify(p.f)})'>${p.label}</div>`
+  ).join(''));
+}
+
+function applyPreset(fields) {
+  // Map field keys to element IDs
+  const map = { f_segment:'f-segment', f_status:'f-status', f_coupon:'f-coupon',
+                f_platform:'f-platform', f_from:'f-from', f_to:'f-to',
+                f_min_orders:'f-min-orders', f_max_orders:'f-max-orders', f_product:'f-product' };
+  // Reset all first
+  Object.values(map).forEach(id => { const e=el(id); if(e) e.value=''; });
+  // Apply preset values
+  Object.entries(fields).forEach(([k,v]) => { const e=el(map[k]); if(e) e.value=v; });
+  runPreview();
+}
+
+// ── BUILD QUERY PARAMS ──────────────────────────────────────────────────────
+function buildParams(limit) {
+  const p = new URLSearchParams();
+  p.set('export_type', currentType);
+  if (limit) p.set('limit', limit);
+  const add = (id, key) => { const v=el(id)?.value; if(v) p.set(key,v); };
+  add('f-from',       'from');
+  add('f-to',         'to');
+  add('f-platform',   'platform');
+  add('f-restaurant', 'shop_id');
+  add('f-status',     'order_status');
+  add('f-coupon',     'has_coupon');
+  add('f-segment',    'customer_segment');
+  add('f-min-orders', 'min_orders');
+  add('f-max-orders', 'max_orders');
+  add('f-product',    'product_name');
+  return p;
+}
+
+// ── PREVIEW ────────────────────────────────────────────────────────────────
+async function runPreview() {
+  setLoading(true);
+  el('error-state').classList.remove('show');
+  try {
+    const p = buildParams(200);
+    const r = await fetch(`${API}/api/export/preview?${p}`, { method:'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || r.status);
+
+    currentData = d.rows || [];
+    renderTable(currentData);
+
+    const badge = el('count-badge');
+    badge.textContent = `${fmt(d.count)} rows previewed`;
+    badge.className   = d.count > 0 ? 'count-badge has-data' : 'count-badge';
+    el('results-title').textContent = `${currentType.charAt(0).toUpperCase()+currentType.slice(1)} — Preview`;
+    el('warn-badge').style.display = d.count >= 200 ? 'inline-block' : 'none';
+  } catch(e) {
+    el('error-state').textContent = '⚠ ' + e.message;
+    el('error-state').classList.add('show');
+  } finally { setLoading(false); }
+}
+
+// ── EXPORT ─────────────────────────────────────────────────────────────────
+async function runExport(format) {
+  const limit = el('f-limit').value;
+  const p     = buildParams(limit);
+  const url   = `${API}/api/export/${format}?${p}`;
+
+  // Trigger download by creating a hidden link
+  const a = document.createElement('a');
+  a.href  = url;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// ── RENDER TABLE ────────────────────────────────────────────────────────────
+function renderTable(rows) {
+  if (!rows.length) {
+    html('table-container','<div class="empty-state"><div class="icon">📭</div><p>No rows match your filters.<br/>Try widening the date range or removing filters.</p></div>');
+    buildColPanel([]);
+    return;
+  }
+
+  const headers = Object.keys(rows[0]).filter(h => !hiddenColumns.has(h));
+  buildColPanel(Object.keys(rows[0]));
+
+  const thead = `<thead><tr>${headers.map(h => `<th>${h.replace(/_/g,' ')}</th>`).join('')}</tr></thead>`;
+  const tbody = `<tbody>${rows.map(r => `<tr>${headers.map(h => renderCell(h, r[h], r)).join('')}</tr>`).join('')}</tbody>`;
+
+  html('table-container', `<div class="tbl-container"><table>${thead}${tbody}</table></div>`);
+}
+
+function renderCell(col, val, row) {
+  if (val === null || val === undefined) return `<td style="color:#2a3550">—</td>`;
+
+  // Contact number
+  if (col === 'customer_contact') return `<td class="contact">${val}</td>`;
+
+  // Platform pill
+  if (col === 'platform') {
+    const c = PCOL[val] || '#607090';
+    return `<td><span style="color:${c};font-weight:700;font-size:10px">${PLAT[val]||val}</span></td>`;
+  }
+
+  // Segment pill
+  if (col === 'customer_segment') {
+    const cls = SCOL[val] || 'pb';
+    return `<td><span class="pill ${cls}">${val}</span></td>`;
+  }
+
+  // Order status
+  if (col === 'order_status') {
+    const cls = val==='Completed'?'pg':val==='Cancelled'?'pr':val==='Accepted'?'pb':'po';
+    return `<td><span class="pill ${cls}">${val}</span></td>`;
+  }
+
+  // Boolean flags
+  if (col === 'is_cancelled' || col === 'has_coupon') {
+    return Number(val)===1
+      ? `<td><span class="pill pr">${col==='is_cancelled'?'Yes':'Used'}</span></td>`
+      : `<td><span class="pill pb">${col==='is_cancelled'?'No':'None'}</span></td>`;
+  }
+
+  // Money columns
+  const moneyCols = ['order_value','net_revenue','discount','menu_discount','cart_discount',
+    'coupon_value','packing_charge','delivery_charge','convenience_charge','tax',
+    'total_gmv','avg_order_value','total_discount'];
+  if (moneyCols.includes(col)) return `<td class="num highlight">${val>0?fmtK(val):'—'}</td>`;
+
+  // Number columns
+  const numCols = ['total_orders','lifetime_orders','order_hour','action_order',
+    'cancelled_orders','coupon_usage','platforms_used','active_days'];
+  if (numCols.includes(col)) return `<td class="num">${fmt(val)}</td>`;
+
+  // Cancellation rate / rates
+  if (col.endsWith('_rate')) return `<td class="num ${Number(val)>10?'orange':''}">${val}%</td>`;
+
+  // Default
+  return `<td>${val}</td>`;
+}
+
+// ── COLUMN VISIBILITY ───────────────────────────────────────────────────────
+function buildColPanel(allCols) {
+  if (!allCols.length) { html('col-panel',''); return; }
+  html('col-panel', allCols.map(col => `
+    <label class="col-chk">
+      <input type="checkbox" ${hiddenColumns.has(col)?'':'checked'}
+             onchange="toggleCol('${col}',this.checked)"/>
+      ${col.replace(/_/g,' ')}
+    </label>`).join(''));
+}
+
+function toggleCol(col, visible) {
+  if (visible) hiddenColumns.delete(col);
+  else         hiddenColumns.add(col);
+  renderTable(currentData);
+}
+
+function toggleColPanel() {
+  el('col-panel').classList.toggle('open');
+}
+
+// ── LOADING STATE ───────────────────────────────────────────────────────────
+function setLoading(on) {
+  ['btn-preview','btn-csv','btn-excel'].forEach(id => el(id).disabled = on);
+  if (on) el('btn-preview').innerHTML = '<span class="spin"></span> Loading…';
+  else    el('btn-preview').innerHTML = '<span>👁</span> Preview (200 rows)';
+}
+
+// ── BOOT ────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

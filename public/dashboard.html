@@ -1,0 +1,1722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Food Analytics Dashboard v5</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#12151f;font-family:'Segoe UI',system-ui,sans-serif;color:#d4dff0;min-height:100vh;overflow-x:hidden}
+
+/* ── NAV ── */
+.nav{background:#0a0d17;border-bottom:2px solid #1e2540;display:flex;align-items:center;padding:0 18px;height:52px;position:sticky;top:0;z-index:200;gap:0;flex-wrap:nowrap;overflow-x:auto}
+.nav::-webkit-scrollbar{height:3px}.nav::-webkit-scrollbar-thumb{background:#2e3a56}
+.brand{font-size:15px;font-weight:800;color:#fff;margin-right:20px;white-space:nowrap;flex-shrink:0}
+.brand span{color:#5b9cf6}
+.tab{padding:0 13px;height:52px;display:flex;align-items:center;font-size:11.5px;color:#556080;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;gap:5px;flex-shrink:0}
+.tab:hover{color:#b0c0dc;background:rgba(255,255,255,.03)}
+.tab.active{color:#5b9cf6;border-bottom-color:#5b9cf6;font-weight:700}
+.nav-r{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0;padding-left:12px}
+.dot{width:7px;height:7px;border-radius:50%;background:#34d399;flex-shrink:0}
+.dot.err{background:#f87171}
+.dot.ok{animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ── FILTER BAR ── */
+.fbar{background:#0a0d17;border-bottom:1px solid #171d2e;padding:7px 18px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:sticky;top:52px;z-index:100}
+.fbar label{font-size:10px;color:#3d4f70;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap}
+.fsel{background:#18213a;border:1px solid #263050;color:#b8c8e0;padding:5px 9px;border-radius:6px;font-size:11px;cursor:pointer;outline:none;min-width:0}
+.fsel:focus{border-color:#5b9cf6}
+input[type=date].fsel{font-size:11px}
+.fbtn{background:#5b9cf6;color:#fff;border:none;padding:5px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
+.fbtn:hover{background:#4a8ce0}
+.fbtn.sec{background:#1e2a45;color:#7090c0}
+.fbtn.sec:hover{background:#263450}
+.err-msg{background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.35);border-radius:6px;padding:8px 14px;color:#f87171;font-size:11px;margin:8px 18px;display:none}
+.err-msg.show{display:block}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid #263050;border-top-color:#5b9cf6;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── LAYOUT ── */
+.page{display:none;padding:14px 18px 24px;animation:fi .2s ease}
+.page.active{display:block}
+@keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.row{display:flex;gap:12px;margin-bottom:12px;align-items:stretch;flex-wrap:wrap}
+.c1{flex:1;min-width:200px}.c2{flex:2;min-width:300px}.c3{flex:3;min-width:400px}.c15{flex:1.5;min-width:240px}
+
+/* ── CARD ── */
+.card{background:#18213a;border:1px solid #1e2a42;border-radius:10px;padding:13px 15px}
+.card-title{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#3d5070;margin-bottom:10px;font-weight:700;display:flex;align-items:center;gap:8px}
+.src-badge{font-size:9px;background:#0f1525;border:1px solid #1e2a42;color:#3d5070;padding:1px 7px;border-radius:20px}
+
+/* ── KPI GRID ── */
+.kpi-grid{display:grid;gap:10px;margin-bottom:12px}
+.k6{grid-template-columns:repeat(6,1fr)}.k5{grid-template-columns:repeat(5,1fr)}
+.k4{grid-template-columns:repeat(4,1fr)}.k3{grid-template-columns:repeat(3,1fr)}.k2{grid-template-columns:repeat(2,1fr)}
+@media(max-width:1100px){.k6{grid-template-columns:repeat(3,1fr)}.k5{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:800px){.k6,.k5,.k4,.k3{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:#18213a;border:1px solid #1e2a42;border-radius:10px;padding:13px 15px;transition:border-color .2s;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kc,#5b9cf6)}
+.kpi:hover{border-color:#334070}
+.kl{font-size:10px;color:#3d5070;text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px}
+.kv{font-size:22px;font-weight:800;line-height:1;color:var(--kc,#d4dff0)}
+.ks{font-size:10px;color:#3d5070;margin-top:5px}
+.kb{display:inline-block;font-size:9px;padding:2px 6px;border-radius:20px;margin-top:4px;font-weight:700}
+.up{background:rgba(52,211,153,.12);color:#34d399}.dn{background:rgba(248,113,113,.12);color:#f87171}
+
+/* ── COLOR VARS ── */
+.blue{--kc:#5b9cf6;color:#5b9cf6}.green{--kc:#34d399;color:#34d399}
+.orange{--kc:#fb923c;color:#fb923c}.red{--kc:#f87171;color:#f87171}
+.purple{--kc:#a78bfa;color:#a78bfa}.teal{--kc:#38bdf8;color:#38bdf8}
+
+/* ── BARS ── */
+.bars{display:flex;flex-direction:column;gap:5px}
+.brow{display:flex;align-items:center;gap:8px}
+.blbl{font-size:11px;color:#607090;width:160px;text-align:right;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.blbl.wide{width:200px}
+.btrack{flex:1;background:#0f1525;border-radius:3px;height:19px;overflow:hidden;position:relative}
+.bfill{height:100%;border-radius:3px;display:flex;align-items:center;justify-content:flex-end;padding-right:7px;transition:width .5s ease}
+.bfill span{font-size:10px;font-weight:700;color:rgba(255,255,255,.88);white-space:nowrap}
+.bval{font-size:10px;color:#607090;margin-left:6px;white-space:nowrap;flex-shrink:0}
+
+/* ── TABLE ── */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:11.5px}
+th{text-align:left;padding:7px 9px;color:#3d5070;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid #1e2a42;white-space:nowrap}
+td{padding:6px 9px;border-bottom:1px solid #131824;color:#9ab0cc;white-space:nowrap}
+tr:hover td{background:#1d2740}
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap}
+.pg{background:rgba(52,211,153,.13);color:#34d399}.pb{background:rgba(91,156,246,.13);color:#5b9cf6}
+.po{background:rgba(251,146,60,.13);color:#fb923c}.pr{background:rgba(248,113,113,.13);color:#f87171}
+.pp{background:rgba(167,139,250,.13);color:#a78bfa}
+
+/* ── DONUT ── */
+.drow{display:flex;align-items:center;gap:14px}
+.dleg{display:flex;flex-direction:column;gap:7px}
+.ditem{display:flex;align-items:flex-start;gap:7px;font-size:11px;color:#607090}
+.ddot{width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-top:2px}
+.dval{color:#d4dff0;font-weight:700;font-size:11.5px}
+
+/* ── FUNNEL ── */
+.fwrap{display:flex;flex-direction:column;gap:4px}
+.fstage{display:flex;align-items:center;gap:10px;margin:2px 0}
+.flbl{font-size:11px;font-weight:700;color:#607090;width:110px;flex-shrink:0;text-align:right}
+.fouter{flex:1;background:#0f1525;border-radius:4px;height:36px;overflow:hidden}
+.finner{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:12px;gap:8px}
+.fcnt{font-size:13px;font-weight:800;color:#fff}
+.fpct{font-size:10px;color:rgba(255,255,255,.45)}
+.farrow{text-align:center;font-size:10px;color:#fb923c;font-weight:700;padding:0 0 0 120px}
+
+/* ── SEGMENT BOXES ── */
+.seg-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+@media(max-width:700px){.seg-grid{grid-template-columns:repeat(2,1fr)}}
+.seg-box{border-radius:9px;padding:14px;text-align:center;border:1px solid transparent}
+.seg-n{font-size:26px;font-weight:800;margin-bottom:2px}
+.seg-l{font-size:10px;text-transform:uppercase;letter-spacing:.8px;opacity:.65}
+.seg-s{font-size:11px;margin-top:5px;opacity:.55}
+
+/* ── INSIGHT ── */
+.note{background:#0f1525;border-left:3px solid #fb923c;border-radius:0 6px 6px 0;padding:8px 12px;font-size:11px;color:#607090;margin-top:10px}
+.note strong{display:block;margin-bottom:2px;color:#fb923c}
+.note.g{border-left-color:#34d399}.note.g strong{color:#34d399}
+.note.b{border-left-color:#5b9cf6}.note.b strong{color:#5b9cf6}
+
+/* ── SECTION HEADING ── */
+.sec-h{font-size:11px;font-weight:700;color:#3d5070;text-transform:uppercase;letter-spacing:.9px;margin:14px 0 8px;padding-bottom:5px;border-bottom:1px solid #1e2a42}
+
+/* ── MISC ── */
+.loading{color:#3d5070;font-size:11px;padding:16px 0;text-align:center}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:600px){.two-col{grid-template-columns:1fr}}
+.tag{display:inline-block;font-size:9px;padding:2px 7px;border-radius:20px;font-weight:700;background:#1e2a42;color:#607090;margin:1px}
+.month-nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.month-btn{background:#18213a;border:1px solid #263050;color:#607090;padding:3px 10px;border-radius:20px;font-size:10px;cursor:pointer;transition:all .15s}
+.month-btn.active{background:#1e3060;border-color:#5b9cf6;color:#5b9cf6;font-weight:700}
+.month-btn:hover{border-color:#5b9cf6;color:#5b9cf6}
+</style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<div class="nav">
+  <div class="brand">🍽 <span>Food</span> Analytics</div>
+  <div class="tab active" data-page="overview">📊 Overview</div>
+  <div class="tab" data-page="trends">📈 Trends</div>
+  <div class="tab" data-page="platform">📡 Platforms</div>
+  <div class="tab" data-page="restaurants">🏪 Restaurants</div>
+  <div class="tab" data-page="funnel">🔄 Funnel</div>
+  <div class="tab" data-page="customers">👥 Customers</div>
+  <div class="tab" data-page="products">🍱 Products</div>
+  <div class="tab" data-page="pnl">💰 P&amp;L</div>
+  <div class="tab" data-page="restaov">🏪 Rest. AOV</div>
+  <div class="tab" data-page="onetimers">📱 One-Timers</div>
+  <div class="tab" data-page="funnelab">🚨 Abandoned</div>
+  <a href="/export.html" target="_blank" style="padding:0 14px;height:52px;display:flex;align-items:center;font-size:11.5px;color:#34d399;white-space:nowrap;gap:5px;text-decoration:none;border-bottom:2px solid #34d39966;font-weight:700;flex-shrink:0">⬇ Export</a>
+  <div class="nav-r">
+    <div class="dot" id="db-dot"></div>
+    <span style="font-size:10px;color:#3d5070" id="db-lbl">—</span>
+    <span style="font-size:10px;color:#3d5070;margin-left:6px" id="last-ref"></span>
+  </div>
+</div>
+
+<!-- ── FILTER BAR ── -->
+<div class="fbar">
+  <label>From</label>
+  <input type="date" id="f-from" class="fsel"/>
+  <label>To</label>
+  <input type="date" id="f-to" class="fsel"/>
+  <label>Platform</label>
+  <select id="f-plat" class="fsel">
+    <option value="">All Platforms</option>
+    <option value="grabfood_whatsapp">GrabFood WhatsApp</option>
+    <option value="swayo_whatsapp">Swayo WhatsApp</option>
+    <option value="swayo_app">Swayo App</option>
+  </select>
+  <label>Restaurant</label>
+  <select id="f-rest" class="fsel" style="max-width:180px"><option value="">All Restaurants</option></select>
+  <button class="fbtn" onclick="applyFilters()">▶ Apply</button>
+  <button class="fbtn sec" onclick="resetFilters()">↺ Reset</button>
+  <span id="loading-ind" style="display:none"><span class="spin"></span> Loading…</span>
+</div>
+<div id="err-msg" class="err-msg">⚠ API error: <span id="err-text"></span></div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     PAGE 1 — OVERVIEW
+════════════════════════════════════════════════════════════════ -->
+<div id="pg-overview" class="page active">
+  <div class="kpi-grid k6" id="ov-kpis"><div class="loading">Loading…</div></div>
+  <div class="row">
+    <div class="card c2">
+      <div class="card-title">📈 GMV &amp; Orders — Month on Month</div>
+      <svg id="trend-svg" width="100%" height="165" viewBox="0 0 640 165"></svg>
+    </div>
+    <div class="card c1">
+      <div class="card-title">📡 Platform Share</div>
+      <div class="drow">
+        <svg id="donut-svg" width="115" height="115" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="42" fill="none" stroke="#0f1525" stroke-width="20"/>
+        </svg>
+        <div class="dleg" id="donut-leg"></div>
+      </div>
+    </div>
+    <div class="card c1">
+      <div class="card-title">📅 Best Day of Week</div>
+      <div class="bars" id="dow-bars"><div class="loading">Loading…</div></div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="card c2">
+      <div class="card-title">⏰ Orders by Hour</div>
+      <svg id="hour-svg" width="100%" height="80" viewBox="0 0 640 80"></svg>
+    </div>
+    <div class="card c1">
+      <div class="card-title">🛵 Delivery Type Mix</div>
+      <div id="delivery-wrap"><div class="loading">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     PAGE 2 — TRENDS (all 4 trend requirements)
+════════════════════════════════════════════════════════════════ -->
+<div id="pg-trends" class="page">
+  <!-- Req 1: Orders Month-on-Month -->
+  <div class="sec-h">📅 Orders Month on Month</div>
+  <div class="row">
+    <div class="card c3">
+      <div class="card-title">Orders &amp; GMV — Monthly</div>
+      <svg id="mom-svg" width="100%" height="180" viewBox="0 0 720 180"></svg>
+    </div>
+    <div class="card c1">
+      <div class="card-title">Monthly Summary</div>
+      <div class="tbl-wrap" id="mom-table"><div class="loading">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- Req 2: Orders Day-on-Day -->
+  <div class="sec-h">📆 Orders Day on Day</div>
+  <div class="row">
+    <div class="card c3">
+      <div class="card-title">Daily Order Trend</div>
+      <svg id="dod-svg" width="100%" height="130" viewBox="0 0 720 130"></svg>
+    </div>
+    <div class="card c1">
+      <div class="card-title">🏆 Best Days</div>
+      <div class="bars" id="best-days"><div class="loading">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- Req 3: AOV per month (food value only) -->
+  <div class="sec-h">💰 Avg. Order Value per Month (Food Value Only)</div>
+  <div class="row">
+    <div class="card c2" id="aov-card">
+      <div class="card-title">AOV — Food Only (excl. packing, delivery, tax)</div>
+      <svg id="aov-svg" width="100%" height="160" viewBox="0 0 640 160"></svg>
+    </div>
+    <div class="card c1">
+      <div class="card-title">AOV by Platform per Month</div>
+      <div class="tbl-wrap" id="aov-table"><div class="loading">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- Req 4: Unique users month-on-month -->
+  <div class="sec-h">👥 Unique Users Month on Month &amp; Total</div>
+  <div class="row">
+    <div class="card c2">
+      <div class="card-title">Unique Customers per Month</div>
+      <svg id="uniq-svg" width="100%" height="150" viewBox="0 0 640 150"></svg>
+    </div>
+    <div class="card c1">
+      <div class="card-title">Unique Users Summary</div>
+      <div class="tbl-wrap" id="uniq-table"><div class="loading">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     PAGE 3 — PLATFORM SPLIT
+════════════════════════════════════════════════════════════════ -->
+<div id="pg-platform" class="page">
+  <div class="kpi-grid k3" id="pl-kpis"><div class="loading">Loading…</div></div>
+  <div class="row">
+    <div class="card c2">
+      <div class="card-title">📊 Full Platform Comparison</div>
+      <div class="tbl-wrap" id="pl-table"><div class="loading">Loading…</div></div>
+    </div>
+    <div class="card c1">
+      <div class="card-title">💰 GMV Share</div>
+      <svg id="pl-gmv-svg" width="100%" height="130" viewBox="0 0 300 130"></svg>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     PAGE 4 — RESTAURANTS
+════════════════════════════════════════════════════════════════ -->
+<div id="pg-restaurants" class="page">
+  <div class="kpi-grid k4" id="rest-kpis"><div class="loading">Loading…</div></div>
+  <div class="row">
+    <div class="card c2">
+      <div class="card-title">🏆 Top Restaurants by GMV <span class="src-badge" id="rest-src"></span></div>
+      <div class="bars" id="rest-bars"><div class="loading">Loading…</div></div>
+    </div>
+    <div class="card c1">
+      <div class="card-title">📋 Restaurant Table</div>
+      <div class="tbl-wrap" id="rest-table"><div class="loading">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     PAGE 5 — FUNNEL
+════════════════════════════════════════════════════════════════ -->
+<div id="pg-funnel" class="page">
+  <div class="kpi-grid k3" id="fn-kpis"><div class="loading">Loading…</div></div>
+  <div class="row">
+    <div class="card c2">
+      <div class="card-title">🔄 Conversion Funnel</div>
+      <div class="fwrap" id="fn-wrap"><div class="loading">Loading…</div></div>
+    </div>
+    <div class="card c1">
+      <div class="card-title">📉 Drop-Off by Stage</div>
+      <div class="bars" id="fn-drops"><div class="loading">Loading…</div></div>
+      <div class="note b" id="fn-rates" style="margin-top:10px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     PAGE 6 — CUSTOMERS (Req 4, 7, 8)
+════════════════════════════════════════════════════════════════ -->
+<div id="pg-customers" class="page">
+  <div class="kpi-grid k4" id="cu-kpis"><div class="loading">Loading…</div></div>
+  <div class="seg-grid" id="seg-grid"><div class="loading" style="grid-column:1/-1">Loading…</div></div>
+
+  <!-- Req 4: Total unique users + by month -->
+  <div class="sec-h">👥 Unique Users — Month on Month</div>
+  <div class="row">
+    <div class="card c2">
+      <div class="card-title">New Unique Customers Each Month</div>
+      <svg id="cu-uniq-svg" width="100%" height="140" viewBox="0 0 640 140"></svg>
+    </div>
+    <div class="card c1">
+      <div class="card-title">Unique Customer Stats</div>
+      <div class="tbl-wrap" id="uniq-cust-table"><div class="loading">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- Req 7: Orders per user per month -->
+  <div class="sec-h">📊 Orders Per User — Per Month</div>
+  <div class="row">
+    <div class="card c2">
+      <div class="card-title">Select Month to see order frequency</div>
+      <div class="month-nav" id="month-nav"></div>
+      <div class="bars" id="freq-bars"><div class="loading">Loading…</div></div>
+    </div>
+    <div class="card c1">
+      <div class="card-title">Frequency Distribution</div>
+      <div class="tbl-wrap" id="freq-table"><div class="loading">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- Req 8: Orders per user across months (lifetime) -->
+  <div class="sec-h">🔁 Orders Per User — Across All Months (Lifetime)</div>
+  <div class="row">
+    <div class="card c2">
+      <div class="card-title">Coupon vs No-Coupon</div>
+      <div id="coupon-wrap"><div class="loading">Loading…</div></div>
+    </div>
+    <div class="card c1">
+      <div class="card-title">New vs Repeat Buyers</div>
+      <div id="repeat-wrap"><div class="loading">Loading…</div></div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="card c3">
+      <div class="card-title">🔝 Top 15 Customers — Lifetime Orders</div>
+      <div class="tbl-wrap" id="top-cust"><div class="loading">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     PAGE 7 — PRODUCTS (Req 5: top 10 items per month per restaurant)
+════════════════════════════════════════════════════════════════ -->
+<div id="pg-products" class="page">
+  <div class="kpi-grid k3" id="pr-kpis"><div class="loading">Loading…</div></div>
+
+  <div class="row">
+    <div class="card c2">
+      <div class="card-title">🍱 Top Items — Swayo App</div>
+      <div class="bars" id="app-items"><div class="loading">Loading…</div></div>
+    </div>
+    <div class="card c1">
+      <div class="card-title">📦 Top Items — GrabFood WhatsApp</div>
+      <div class="bars" id="gf-items"><div class="loading">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- Req 5: Top 10 per month per restaurant -->
+  <div class="sec-h">🏪 Top 10 Items Per Month Per Restaurant</div>
+  <div class="row">
+    <div class="card c3">
+      <div class="card-title">Select Month &amp; Restaurant</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <select id="pr-month" class="fsel" onchange="renderTopByRestMonth()">
+          <option value="">All Months</option>
+        </select>
+        <select id="pr-rest" class="fsel" onchange="renderTopByRestMonth()" style="max-width:200px">
+          <option value="">All Restaurants</option>
+        </select>
+      </div>
+      <div class="bars" id="rest-month-bars"><div class="loading">Loading…</div></div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="card c1">
+      <div class="card-title">💬 Swayo WhatsApp Items</div>
+      <div class="bars" id="wa-items"><div class="loading">Loading…</div></div>
+    </div>
+    <div class="card c1">
+      <div class="card-title">🏪 Items by Restaurant</div>
+      <div class="bars" id="rest-items"><div class="loading">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     PAGE 8 — P&L
+════════════════════════════════════════════════════════════════ -->
+<div id="pg-pnl" class="page">
+  <div class="kpi-grid k4" id="pnl-kpis"><div class="loading">Loading…</div></div>
+  <div class="row">
+    <div class="card c2">
+      <div class="card-title">📊 Monthly P&amp;L</div>
+      <div class="tbl-wrap" id="pnl-table"><div class="loading">Loading…</div></div>
+    </div>
+    <div class="card c1">
+      <div class="card-title">🧮 Cost Breakdown</div>
+      <svg id="pnl-svg" width="100%" height="190" viewBox="0 0 300 190"></svg>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     PAGE 9 — RESTAURANT AOV DEEP-DIVE
+     Req 9: AOV for MannFoodCourt on Swayo App (Food + Packaging), Jan–Mar
+════════════════════════════════════════════════════════════════ -->
+<div id="pg-restaov" class="page">
+  <!-- Inline filters specific to this page -->
+  <div style="background:#0d1221;border:1px solid #1e2540;border-radius:10px;padding:14px 16px;margin-bottom:14px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+    <div>
+      <div style="font-size:10px;color:#3d5070;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">Restaurant (name search)</div>
+      <input type="text" id="ra-rest-name" class="fsel" placeholder="e.g. Mann" style="width:180px"/>
+    </div>
+    <div>
+      <div style="font-size:10px;color:#3d5070;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">Platform</div>
+      <select id="ra-platform" class="fsel">
+        <option value="">All Platforms</option>
+        <option value="swayo_app" selected>Swayo App</option>
+        <option value="grabfood_whatsapp">GrabFood WhatsApp</option>
+        <option value="swayo_whatsapp">Swayo WhatsApp</option>
+      </select>
+    </div>
+    <div>
+      <div style="font-size:10px;color:#3d5070;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">From</div>
+      <input type="date" id="ra-from" class="fsel" value="2026-01-01"/>
+    </div>
+    <div>
+      <div style="font-size:10px;color:#3d5070;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">To</div>
+      <input type="date" id="ra-to" class="fsel" value="2026-03-31"/>
+    </div>
+    <button class="fbtn" onclick="loadRestAOV()">▶ Run</button>
+  </div>
+
+  <div class="kpi-grid k4" id="ra-kpis"><div class="loading">Configure filters above and click Run</div></div>
+
+  <div class="row">
+    <div class="card c2">
+      <div class="card-title">📈 AOV Trend — Month by Month</div>
+      <svg id="ra-svg" width="100%" height="180" viewBox="0 0 640 180"></svg>
+    </div>
+    <div class="card c1">
+      <div class="card-title">🧮 AOV Breakdown</div>
+      <div class="tbl-wrap" id="ra-table"><div class="loading">—</div></div>
+    </div>
+  </div>
+
+  <div class="note b" style="margin-top:4px">
+    <strong>AOV definitions used</strong>
+    <b>Food + Packing</b> = order_value − delivery_charge − tax − convenience_charge &nbsp;|&nbsp;
+    <b>Food Only</b> = also minus packing_charge &nbsp;|&nbsp;
+    <b>Gross</b> = full order_value customer paid
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     PAGE 10 — ONE-TIME USERS (Swayo App, last 3 months) + WA numbers
+     Req 10: Last 3 months unique users who ordered only once via Swayo App
+════════════════════════════════════════════════════════════════ -->
+<div id="pg-onetimers" class="page">
+  <div style="background:#0d1221;border:1px solid #1e2540;border-radius:10px;padding:14px 16px;margin-bottom:14px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+    <div>
+      <div style="font-size:10px;color:#3d5070;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">Platform</div>
+      <select id="ot-platform" class="fsel">
+        <option value="swayo_app" selected>Swayo App</option>
+        <option value="grabfood_whatsapp">GrabFood WhatsApp</option>
+        <option value="swayo_whatsapp">Swayo WhatsApp</option>
+        <option value="">All Platforms</option>
+      </select>
+    </div>
+    <div>
+      <div style="font-size:10px;color:#3d5070;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">From</div>
+      <input type="date" id="ot-from" class="fsel"/>
+    </div>
+    <div>
+      <div style="font-size:10px;color:#3d5070;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">To</div>
+      <input type="date" id="ot-to" class="fsel"/>
+    </div>
+    <div>
+      <div style="font-size:10px;color:#3d5070;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">Restaurant (optional)</div>
+      <select id="ot-rest" class="fsel" style="max-width:180px"><option value="">All Restaurants</option></select>
+    </div>
+    <button class="fbtn" onclick="loadOneTimers()">▶ Run</button>
+    <button class="fbtn" style="background:#1a3a2a;color:#34d399;border:1px solid #234d35" onclick="exportOneTimers('csv')">⬇ CSV</button>
+    <button class="fbtn" style="background:#1e3a18;color:#86efac;border:1px solid #2a4d22" onclick="exportOneTimers('excel')">⬇ Excel</button>
+  </div>
+
+  <div class="kpi-grid k3" id="ot-kpis"><div class="loading">Configure filters above and click Run</div></div>
+
+  <div class="row">
+    <div class="card c3">
+      <div class="card-title">📱 One-Time Users — WhatsApp / Contact Numbers
+        <span class="src-badge">lifetime_orders = 1 in agg_customer_behavior</span>
+      </div>
+      <div class="tbl-wrap" id="ot-table"><div class="loading">—</div></div>
+    </div>
+  </div>
+
+  <div class="note g" style="margin-top:4px">
+    <strong>How "one-time" is defined</strong>
+    These customers have <strong>total_orders = 1 across all time</strong> in agg_customer_behavior.
+    They placed exactly one order on Swayo App in the selected period and never came back.
+    The WhatsApp number shown is their customer_contact from fact_orders — this is the number
+    they registered with and is directly usable for outreach.
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     PAGE 11 — JFP FUNNEL ABANDONED CARTS
+     Req 11: VIEW_CART customers who didn't order, deduped, team filtered
+════════════════════════════════════════════════════════════════ -->
+<div id="pg-funnelab" class="page">
+  <div style="background:#0d1221;border:1px solid #1e2540;border-radius:10px;padding:14px 16px;margin-bottom:14px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+    <div>
+      <div style="font-size:10px;color:#3d5070;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">Restaurant</div>
+      <select id="fa-rest" class="fsel" style="max-width:200px"><option value="">Select Restaurant</option></select>
+    </div>
+    <div>
+      <div style="font-size:10px;color:#3d5070;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">From</div>
+      <input type="date" id="fa-from" class="fsel"/>
+    </div>
+    <div>
+      <div style="font-size:10px;color:#3d5070;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">To</div>
+      <input type="date" id="fa-to" class="fsel"/>
+    </div>
+    <div>
+      <div style="font-size:10px;color:#3d5070;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">Team threshold (VIEW_CART ≥)</div>
+      <input type="number" id="fa-threshold" class="fsel" value="9" min="2" max="50" style="width:80px"
+             title="Customers with VIEW_CART count >= this are flagged as internal team"/>
+    </div>
+    <button class="fbtn" onclick="loadFunnelAb()">▶ Analyse</button>
+    <button class="fbtn" style="background:#1a3a2a;color:#34d399;border:1px solid #234d35" onclick="exportFunnelAb()">⬇ Export Abandoned CSV</button>
+  </div>
+
+  <!-- Summary KPIs -->
+  <div class="kpi-grid k5" id="fa-kpis"><div class="loading">Configure filters above and click Analyse</div></div>
+
+  <div class="row">
+    <!-- Column 1: To Call — real abandoned customers -->
+    <div class="card c1">
+      <div class="card-title" style="color:#f87171">📞 CALL THESE — Viewed Cart, Didn't Order</div>
+      <div style="font-size:10px;color:#3d5070;margin-bottom:10px">
+        Real customers · VIEW_CART count &lt; threshold · No order placed
+      </div>
+      <div class="tbl-wrap" id="fa-abandoned"><div class="loading">—</div></div>
+    </div>
+
+    <!-- Column 2: Did order + their view cart count -->
+    <div class="card c1">
+      <div class="card-title" style="color:#34d399">✅ Ordered — VIEW_CART Details</div>
+      <div style="font-size:10px;color:#3d5070;margin-bottom:10px">
+        Placed order · shows how many times they hit VIEW_CART before ordering
+      </div>
+      <div class="tbl-wrap" id="fa-ordered"><div class="loading">—</div></div>
+    </div>
+
+    <!-- Column 3: Team/internal carts -->
+    <div class="card c1">
+      <div class="card-title" style="color:#fb923c">🏢 Likely Internal Team</div>
+      <div style="font-size:10px;color:#3d5070;margin-bottom:10px">
+        VIEW_CART count ≥ threshold — excluded from conversion %
+      </div>
+      <div class="tbl-wrap" id="fa-team"><div class="loading">—</div></div>
+    </div>
+  </div>
+
+  <!-- Corrected conversion % -->
+  <div class="note g" id="fa-corrected-note" style="margin-top:4px;display:none">
+    <strong>✅ Corrected VIEW_CART → Order Conversion Rate</strong>
+    <span id="fa-corrected-text"></span>
+  </div>
+
+  <div class="note" style="margin-top:8px">
+    <strong>How team filtering works</strong>
+    The standard conversion rate is skewed because internal team members repeatedly open VIEW_CART
+    (e.g. for testing, QA, content). Any customer_contact with VIEW_CART count ≥ <strong id="fa-threshold-shown">9</strong>
+    in the selected period is flagged as likely internal and moved to the third column.
+    They are excluded from the "Abandoned" and conversion calculations, giving you a clean picture
+    of real customer behaviour. Adjust the threshold above to tune this.
+  </div>
+</div>
+
+
+<script>
+const API = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+
+// ── PLATFORM CONFIG (exact values from pipeline) ─────────────────────────────
+const PLAT = { grabfood_whatsapp:'GrabFood WhatsApp', swayo_whatsapp:'Swayo WhatsApp', swayo_app:'Swayo App' };
+const PCOL = { grabfood_whatsapp:'#34d399', swayo_whatsapp:'#fb923c', swayo_app:'#5b9cf6' };
+
+// Customer segment values from agg_customer_behavior
+const SCOL = { VIP:'#f87171', Loyal:'#fb923c', Repeat:'#5b9cf6', 'One-time':'#a78bfa' };
+const SBGC = { VIP:'rgba(248,113,113,.09)', Loyal:'rgba(251,146,60,.09)', Repeat:'rgba(91,156,246,.09)', 'One-time':'rgba(167,139,250,.09)' };
+
+const COLORS  = ['#5b9cf6','#34d399','#fb923c','#a78bfa','#f87171','#38bdf8','#fbbf24'];
+const GR = [
+  'linear-gradient(90deg,#5b9cf6,#7ab8ff)',
+  'linear-gradient(90deg,#34d399,#6ee7b7)',
+  'linear-gradient(90deg,#a78bfa,#c4b5fd)',
+  'linear-gradient(90deg,#fb923c,#fbbf7c)',
+  'linear-gradient(90deg,#f87171,#fca5a5)',
+  'linear-gradient(90deg,#38bdf8,#7dd3fc)',
+  'linear-gradient(90deg,#fbbf24,#fde68a)',
+];
+
+// ── FORMATTERS ────────────────────────────────────────────────────────────────
+const fmt  = n => (n==null||isNaN(n)) ? '—' : Number(n).toLocaleString('en-IN');
+const fmtR = n => n==null ? '—' : '₹'+fmt(Math.round(Number(n)));
+const fmtK = n => {
+  if(n==null||isNaN(n)) return '—';
+  n=Number(n);
+  return n>=100000 ? '₹'+(n/100000).toFixed(2)+'L'
+       : n>=1000   ? '₹'+(n/1000).toFixed(1)+'K' : fmtR(n);
+};
+const pct = (a,b) => Number(b) ? (Number(a)/Number(b)*100).toFixed(1)+'%' : '—';
+const el  = id => document.getElementById(id);
+const html = (id,h) => el(id).innerHTML = h;
+
+// ── API CALL ──────────────────────────────────────────────────────────────────
+async function api(path) {
+  const r = await fetch(`${API}/api/${path}`);
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.status);
+  return j;
+}
+
+// ── CURRENT FILTER PARAMS ─────────────────────────────────────────────────────
+function fp() {
+  const p = new URLSearchParams();
+  const from=el('f-from').value, to=el('f-to').value;
+  const plat=el('f-plat').value, rest=el('f-rest').value;
+  if (from) p.set('from', from);
+  if (to)   p.set('to',   to);
+  if (plat) p.set('platform', plat);
+  if (rest) p.set('shop_id', rest);
+  return p.toString();
+}
+
+// ── SHOW / HIDE SPINNER ───────────────────────────────────────────────────────
+let loadCount = 0;
+function startLoad() { loadCount++; el('loading-ind').style.display='inline-flex'; }
+function endLoad()   { if(--loadCount<=0){ loadCount=0; el('loading-ind').style.display='none'; } }
+
+// ── HEALTH ────────────────────────────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    await api('health');
+    el('db-dot').className='dot ok'; el('db-lbl').textContent='DB ✓';
+    el('err-msg').classList.remove('show');
+  } catch(e) {
+    el('db-dot').className='dot err'; el('db-lbl').textContent='DB ✗';
+    el('err-msg').classList.add('show'); el('err-text').textContent=e.message;
+  }
+}
+
+// ── GLOBAL DATA CACHE (for cross-widget interactions) ────────────────────────
+let _cache = {};
+
+// ── INIT DATE PICKERS from actual DB data ────────────────────────────────────
+async function initFilters() {
+  try {
+    const d = await api('filters');
+    // Set date pickers to actual data range
+    if (d.min_date) el('f-from').value = d.min_date;
+    if (d.max_date) el('f-to').value   = d.max_date;
+
+    // Restaurant dropdown — name resolved via COALESCE in server
+    const rs = el('f-rest');
+    (d.restaurants||[]).forEach(r => {
+      const o = document.createElement('option');
+      o.value = r.shop_id;
+      o.textContent = r.restaurant_name || r.shop_id;
+      rs.appendChild(o);
+    });
+
+    // Also populate restaurant dropdowns on new pages
+    ['ot-rest','fa-rest'].forEach(selId => {
+      const sel = el(selId);
+      if (!sel) return;
+      (d.restaurants||[]).forEach(r => {
+        const o = document.createElement('option');
+        o.value = r.shop_id;
+        o.textContent = r.restaurant_name || r.shop_id;
+        sel.appendChild(o);
+      });
+    });
+
+    // Set date pickers on new pages to match DB range
+    ['ot-from','fa-from'].forEach(id => { const e=el(id); if(e && d.min_date) e.value=d.min_date; });
+    ['ot-to','fa-to'].forEach(id   => { const e=el(id); if(e && d.max_date) e.value=d.max_date; });
+  } catch(e) { console.warn('Filter init error', e); }
+}
+
+function resetFilters() {
+  // Will re-init from API
+  el('f-plat').value = '';
+  el('f-rest').value = '';
+  initFilters().then(() => applyFilters());
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  OVERVIEW
+// ════════════════════════════════════════════════════════════════════════════
+async function loadOverview() {
+  startLoad();
+  try {
+    const d = await api('overview?'+fp());
+    const k = d.kpis;
+
+    html('ov-kpis',`
+      <div class="kpi blue"><div class="kl">Total GMV</div><div class="kv">${fmtK(k.total_gmv)}</div><div class="ks">Net: ${fmtK(k.total_net_revenue)}</div></div>
+      <div class="kpi green"><div class="kl">Total Orders</div><div class="kv">${fmt(k.total_orders)}</div><div class="ks">${fmt(k.cancelled_orders)} cancelled</div></div>
+      <div class="kpi"><div class="kl">Avg Order Value</div><div class="kv">${fmtR(k.avg_order_value)}</div><div class="ks">Coupon rate: ${k.coupon_rate}%</div></div>
+      <div class="kpi orange"><div class="kl">Unique Customers</div><div class="kv">${fmt(k.unique_customers)}</div><div class="ks">${fmt(k.coupon_orders)} used coupons</div></div>
+      <div class="kpi red"><div class="kl">Cancel Rate</div><div class="kv">${k.cancel_rate}%</div><div class="ks">${fmt(k.cancelled_orders)} orders</div></div>
+      <div class="kpi teal"><div class="kl">Total Discount</div><div class="kv">${fmtK(k.total_discount)}</div><div class="ks">Menu + Cart</div></div>`);
+
+    renderTrend(d.monthly);
+    renderDonut(d.platforms, k.total_orders);
+    renderDow(d.dow);
+    renderHourly(d.hourly);
+    renderDelivery(d.delivery);
+    // cache for other pages
+    _cache.overview = d;
+  } finally { endLoad(); }
+}
+
+function renderTrend(monthly) {
+  if(!monthly||!monthly.length){ el('trend-svg').innerHTML='<text x="320" y="90" text-anchor="middle" fill="#3d5070" font-size="12">No data for selected range</text>'; return; }
+  const maxG=Math.max(...monthly.map(m=>m.gmv),1), maxO=Math.max(...monthly.map(m=>m.orders),1);
+  const n=monthly.length, W=640,H=140,pL=62,pR=25,pT=12,pB=38;
+  const xS=(W-pL-pR)/(n>1?n-1:1);
+  const pts=monthly.map((m,i)=>({ x:pL+i*xS, yG:pT+(1-m.gmv/maxG)*(H-pT-pB), yO:pT+(1-m.orders/maxO)*(H-pT-pB), m }));
+  const polyG=pts.map(p=>`${p.x.toFixed(1)},${p.yG.toFixed(1)}`).join(' ');
+  const polyO=pts.map(p=>`${p.x.toFixed(1)},${p.yO.toFixed(1)}`).join(' ');
+  const fill=polyG+` ${pts[pts.length-1].x},${H-pB} ${pts[0].x},${H-pB}`;
+  const grid=[.25,.5,.75,1].map(f=>{
+    const y=(pT+(1-f)*(H-pT-pB)).toFixed(1);
+    return `<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" stroke="#1e2a42" stroke-width="1"/>
+            <text x="${pL-4}" y="${+y+3}" text-anchor="end" fill="#3d5070" font-size="9">${fmtK(maxG*f)}</text>`;
+  }).join('');
+  const dots=pts.map(p=>`
+    <circle cx="${p.x.toFixed(1)}" cy="${p.yG.toFixed(1)}" r="4.5" fill="#5b9cf6" stroke="#18213a" stroke-width="2"/>
+    <text x="${p.x.toFixed(1)}" y="${(p.yG-8).toFixed(1)}" text-anchor="middle" fill="#5b9cf6" font-size="8.5" font-weight="700">${fmtK(p.m.gmv)}</text>
+    <circle cx="${p.x.toFixed(1)}" cy="${p.yO.toFixed(1)}" r="3" fill="#fb923c"/>
+    <text x="${p.x.toFixed(1)}" y="${H-pB+16}" text-anchor="middle" fill="#3d5070" font-size="9.5">${p.m.month_key}</text>`).join('');
+  el('trend-svg').innerHTML=`<defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#5b9cf6" stop-opacity=".28"/><stop offset="100%" stop-color="#5b9cf6" stop-opacity=".01"/></linearGradient></defs>
+    ${grid}<polygon points="${fill}" fill="url(#g1)"/>
+    <polyline points="${polyG}" fill="none" stroke="#5b9cf6" stroke-width="2" stroke-linejoin="round"/>
+    <polyline points="${polyO}" fill="none" stroke="#fb923c" stroke-width="1.5" stroke-dasharray="4,3"/>
+    ${dots}
+    <rect x="${pL}" y="${H-pB+24}" width="10" height="2.5" fill="#5b9cf6" rx="1"/>
+    <text x="${pL+14}" y="${H-pB+28}" fill="#3d5070" font-size="8.5">GMV</text>
+    <line x1="${pL+45}" y1="${H-pB+26}" x2="${pL+55}" y2="${H-pB+26}" stroke="#fb923c" stroke-width="1.5" stroke-dasharray="3,2"/>
+    <text x="${pL+59}" y="${H-pB+28}" fill="#3d5070" font-size="8.5">Orders</text>`;
+}
+
+function renderDonut(platforms, total) {
+  if(!platforms||!platforms.length) return;
+  const circ=2*Math.PI*42; let off=0;
+  const arcs=platforms.map((p,i)=>{
+    const f=total>0?p.orders/total:0, l=f*circ;
+    const a=`<circle cx="60" cy="60" r="42" fill="none" stroke="${PCOL[p.platform]||COLORS[i]}"
+      stroke-width="20" stroke-dasharray="${l.toFixed(1)} ${circ.toFixed(1)}"
+      stroke-dashoffset="${(-off).toFixed(1)}" transform="rotate(-90 60 60)"/>`;
+    off+=l; return a;
+  }).join('');
+  el('donut-svg').innerHTML=`<circle cx="60" cy="60" r="42" fill="none" stroke="#0f1525" stroke-width="20"/>${arcs}
+    <text x="60" y="56" text-anchor="middle" fill="#d4dff0" font-size="13" font-weight="800">${fmt(total)}</text>
+    <text x="60" y="68" text-anchor="middle" fill="#3d5070" font-size="9">orders</text>`;
+  el('donut-leg').innerHTML=platforms.map((p,i)=>`
+    <div class="ditem"><div class="ddot" style="background:${PCOL[p.platform]||COLORS[i]}"></div>
+    <div><div>${PLAT[p.platform]||p.platform}</div><div class="dval">${fmt(p.orders)} · ${pct(p.orders,total)}</div></div></div>`).join('');
+}
+
+function renderDow(dow) {
+  if(!dow||!dow.length){ html('dow-bars','<div class="loading">No data</div>'); return; }
+  const max=Math.max(...dow.map(d=>d.orders),1);
+  const peak=dow.reduce((a,b)=>b.orders>a.orders?b:a);
+  html('dow-bars', dow.map((d,i)=>`
+    <div class="brow">
+      <div class="blbl" style="width:85px">${d.order_dow}${d.order_dow===peak.order_dow?' 🏆':''}</div>
+      <div class="btrack"><div class="bfill" style="width:${(d.orders/max*100).toFixed(0)}%;background:${GR[i%GR.length]}">
+        <span>${fmt(d.orders)}</span></div></div>
+      <div class="bval">${fmtK(d.gmv)}</div></div>`).join(''));
+}
+
+function renderHourly(hourly) {
+  if(!hourly||!hourly.length){ el('hour-svg').innerHTML='<text x="320" y="45" text-anchor="middle" fill="#3d5070" font-size="11">No data</text>'; return; }
+  const max=Math.max(...hourly.map(h=>h.orders),1);
+  const W=640,pL=28,pR=8,bw=(W-pL-pR)/24;
+  const bars=hourly.map(h=>{
+    const bh=Math.max((h.orders/max*55).toFixed(0),1), x=pL+h.order_hour*bw;
+    return `<rect x="${(x+1).toFixed(0)}" y="${60-bh}" width="${(bw-2).toFixed(0)}" height="${bh}" fill="#5b9cf6" rx="1.5" opacity=".72">
+      <title>${h.order_hour}:00 — ${fmt(h.orders)} orders</title></rect>`;
+  }).join('');
+  const lbl=[0,4,8,12,16,20,23].map(h=>`<text x="${(pL+h*bw+bw/2).toFixed(0)}" y="76" text-anchor="middle" fill="#3d5070" font-size="8.5">${h}:00</text>`).join('');
+  el('hour-svg').innerHTML=bars+lbl;
+}
+
+function renderDelivery(delivery) {
+  if(!delivery||!delivery.length){ html('delivery-wrap','<div class="loading">No data</div>'); return; }
+  const byPlat={};
+  delivery.forEach(d=>{ if(!byPlat[d.platform]) byPlat[d.platform]=[]; byPlat[d.platform].push(d); });
+  let h='';
+  Object.entries(byPlat).forEach(([plat,rows])=>{
+    const max=Math.max(...rows.map(r=>r.cnt),1);
+    h+=`<div style="font-size:10px;color:${PCOL[plat]||'#fff'};font-weight:700;margin:8px 0 4px">${PLAT[plat]||plat}</div>
+        <div class="bars" style="gap:3px">`+rows.map((r,i)=>`
+      <div class="brow"><div class="blbl" style="width:80px">${r.delivery_type||'(none)'}</div>
+      <div class="btrack"><div class="bfill" style="width:${(r.cnt/max*100).toFixed(0)}%;background:${PCOL[plat]||COLORS[i]}">
+        <span>${fmt(r.cnt)}</span></div></div></div>`).join('')+'</div>';
+  });
+  html('delivery-wrap',h);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  TRENDS PAGE
+// ════════════════════════════════════════════════════════════════════════════
+async function loadTrends() {
+  startLoad();
+  try {
+    const [ov, aov] = await Promise.all([
+      api('overview?'+fp()),
+      api('aov_monthly?'+fp()),
+    ]);
+    _cache.trends = { ov, aov };
+    const monthly = ov.monthly || [];
+    const daily   = ov.daily   || [];
+
+    // ── Req 1: Month-on-Month orders ──────────────────────────────────────────
+    renderMoM(monthly);
+    renderMoMTable(monthly);
+
+    // ── Req 2: Day-on-Day ─────────────────────────────────────────────────────
+    renderDoD(daily);
+    renderBestDays(ov.dow||[]);
+
+    // ── Req 3: AOV food-only per month ────────────────────────────────────────
+    renderAOV(aov.rows||[]);
+    renderAOVTable(aov.rows||[]);
+
+    // ── Req 4: Unique users ───────────────────────────────────────────────────
+    renderUniqUsers(monthly);
+    renderUniqTable(monthly);
+  } finally { endLoad(); }
+}
+
+function renderMoM(monthly) {
+  if(!monthly.length){ el('mom-svg').innerHTML='<text x="360" y="90" text-anchor="middle" fill="#3d5070" font-size="12">No data</text>'; return; }
+  const W=720,H=155,pL=60,pR=20,pT=10,pB=35;
+  const bw=(W-pL-pR)/monthly.length, maxO=Math.max(...monthly.map(m=>m.orders),1);
+  const bars=monthly.map((m,i)=>{
+    const bh=Math.max(((m.orders/maxO)*(H-pT-pB)).toFixed(0),2);
+    const x=pL+i*bw, col=COLORS[i%COLORS.length];
+    return `<rect x="${(x+2).toFixed(0)}" y="${H-pB-bh}" width="${(bw-4).toFixed(0)}" height="${bh}" fill="${col}" rx="2" opacity=".8"/>
+      <text x="${(x+bw/2).toFixed(0)}" y="${H-pB-bh-5}" text-anchor="middle" fill="${col}" font-size="9" font-weight="700">${fmt(m.orders)}</text>
+      <text x="${(x+bw/2).toFixed(0)}" y="${H-pB+14}" text-anchor="middle" fill="#3d5070" font-size="9">${m.month_key}</text>`;
+  }).join('');
+  const grid=[.25,.5,.75,1].map(f=>{
+    const y=(pT+(1-f)*(H-pT-pB)).toFixed(0);
+    return `<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" stroke="#1e2a42" stroke-width="1"/>
+            <text x="${pL-4}" y="${+y+3}" text-anchor="end" fill="#3d5070" font-size="8">${Math.round(maxO*f)}</text>`;
+  }).join('');
+  el('mom-svg').innerHTML=grid+bars;
+}
+
+function renderMoMTable(monthly) {
+  if(!monthly.length){ html('mom-table','<div class="loading">No data</div>'); return; }
+  const rows=monthly.map((m,i)=>{
+    const prev=monthly[i-1];
+    const chg=prev&&prev.orders>0?((m.orders-prev.orders)/prev.orders*100).toFixed(1):null;
+    return `<tr><td>${m.month_key}</td><td>${fmt(m.orders)}</td>
+      <td>${chg!=null?`<span style="color:${chg>=0?'#34d399':'#f87171'}">${chg>=0?'▲':'▼'}${Math.abs(chg)}%</span>`:'—'}</td>
+      <td>${fmtK(m.gmv)}</td><td>${fmtR(m.aov)}</td><td>${fmt(m.unique_customers)}</td></tr>`;
+  }).join('');
+  html('mom-table',`<table><thead><tr><th>Month</th><th>Orders</th><th>MoM Δ</th><th>GMV</th><th>AOV</th><th>Uniq Cust</th></tr></thead><tbody>${rows}</tbody></table>`);
+}
+
+function renderDoD(daily) {
+  if(!daily.length){ el('dod-svg').innerHTML='<text x="360" y="70" text-anchor="middle" fill="#3d5070" font-size="12">No data</text>'; return; }
+  const W=720,H=110,pL=35,pR=10,pT=10,pB=25;
+  const maxO=Math.max(...daily.map(d=>d.orders),1);
+  const bw=Math.max((W-pL-pR)/daily.length,1);
+  const bars=daily.map((d,i)=>{
+    const bh=Math.max(((d.orders/maxO)*(H-pT-pB)).toFixed(0),1);
+    const x=pL+i*bw;
+    const col=d.orders===maxO?'#34d399':'#5b9cf6';
+    return `<rect x="${x.toFixed(1)}" y="${H-pB-bh}" width="${Math.max(bw-1,0.5).toFixed(1)}" height="${bh}" fill="${col}" rx="1" opacity=".75">
+      <title>${d.order_date} (${d.dow}) — ${fmt(d.orders)} orders</title></rect>`;
+  }).join('');
+  // X-axis: only show monthly labels
+  const months={};
+  daily.forEach((d,i)=>{ const m=String(d.order_date).substr(0,7); if(!months[m]) months[m]=i; });
+  const xlbl=Object.entries(months).map(([m,i])=>{
+    const x=pL+i*bw;
+    return `<text x="${x.toFixed(0)}" y="${H-pB+16}" fill="#3d5070" font-size="8.5">${m}</text>`;
+  }).join('');
+  el('dod-svg').innerHTML=bars+xlbl+`<text x="${pL}" y="10" fill="#34d399" font-size="8">▩ peak day</text>`;
+}
+
+function renderBestDays(dow) {
+  if(!dow.length){ html('best-days','<div class="loading">No data</div>'); return; }
+  const sorted=[...dow].sort((a,b)=>b.orders-a.orders);
+  const max=sorted[0].orders;
+  html('best-days', sorted.map((d,i)=>`
+    <div class="brow">
+      <div class="blbl" style="width:90px">${d.order_dow}${i===0?' 🏆':''}</div>
+      <div class="btrack"><div class="bfill" style="width:${(d.orders/max*100).toFixed(0)}%;background:${i===0?GR[1]:GR[0]}">
+        <span>${fmt(d.orders)}</span></div></div>
+      <div class="bval">${fmtK(d.gmv)}</div></div>`).join(''));
+}
+
+function renderAOV(rows) {
+  // Roll up by month across platforms
+  const byMonth={};
+  rows.forEach(r=>{ if(!byMonth[r.month_key]) byMonth[r.month_key]={k:r.month_key,aovFood:0,cnt:0}; byMonth[r.month_key].aovFood+=Number(r.aov_food_only); byMonth[r.month_key].cnt++; });
+  const months=Object.values(byMonth).sort((a,b)=>a.k.localeCompare(b.k));
+  if(!months.length){ el('aov-svg').innerHTML='<text x="320" y="80" text-anchor="middle" fill="#3d5070" font-size="12">No data</text>'; return; }
+  months.forEach(m=>m.aovFood=m.aovFood/m.cnt);
+  const W=640,H=130,pL=65,pR=25,pT=10,pB=30;
+  const maxA=Math.max(...months.map(m=>m.aovFood),1);
+  const n=months.length, xS=(W-pL-pR)/(n>1?n-1:1);
+  const pts=months.map((m,i)=>({ x:pL+i*xS, y:pT+(1-m.aovFood/maxA)*(H-pT-pB), m }));
+  const poly=pts.map(p=>`${p.x.toFixed(0)},${p.y.toFixed(0)}`).join(' ');
+  const fill=poly+` ${pts[pts.length-1].x},${H-pB} ${pts[0].x},${H-pB}`;
+  const grid=[.5,1].map(f=>{
+    const y=(pT+(1-f)*(H-pT-pB)).toFixed(0);
+    return `<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" stroke="#1e2a42" stroke-width="1"/>
+            <text x="${pL-4}" y="${+y+3}" text-anchor="end" fill="#3d5070" font-size="9">${fmtR(maxA*f)}</text>`;
+  }).join('');
+  const dots=pts.map(p=>`
+    <circle cx="${p.x.toFixed(0)}" cy="${p.y.toFixed(0)}" r="4" fill="#34d399" stroke="#18213a" stroke-width="1.5"/>
+    <text x="${p.x.toFixed(0)}" y="${(p.y-8).toFixed(0)}" text-anchor="middle" fill="#34d399" font-size="9" font-weight="700">${fmtR(p.m.aovFood)}</text>
+    <text x="${p.x.toFixed(0)}" y="${H-pB+16}" text-anchor="middle" fill="#3d5070" font-size="9">${p.m.k}</text>`).join('');
+  el('aov-svg').innerHTML=`<defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#34d399" stop-opacity=".22"/><stop offset="100%" stop-color="#34d399" stop-opacity=".01"/></linearGradient></defs>
+    ${grid}<polygon points="${fill}" fill="url(#g2)"/>
+    <polyline points="${poly}" fill="none" stroke="#34d399" stroke-width="2" stroke-linejoin="round"/>${dots}`;
+}
+
+function renderAOVTable(rows) {
+  if(!rows.length){ html('aov-table','<div class="loading">No data</div>'); return; }
+  const tbl=rows.map(r=>`<tr><td>${r.month_key}</td>
+    <td>${PLAT[r.platform]||r.platform}</td>
+    <td>${fmt(r.orders)}</td>
+    <td style="color:#5b9cf6;font-weight:700">${fmtR(r.aov_gross)}</td>
+    <td style="color:#34d399;font-weight:700">${fmtR(r.aov_food_only)}</td></tr>`).join('');
+  html('aov-table',`<table><thead><tr><th>Month</th><th>Platform</th><th>Orders</th><th>AOV (Gross)</th><th>AOV (Food)</th></tr></thead><tbody>${tbl}</tbody></table>`);
+}
+
+function renderUniqUsers(monthly) {
+  if(!monthly.length){ el('uniq-svg').innerHTML='<text x="320" y="75" text-anchor="middle" fill="#3d5070" font-size="12">No data</text>'; return; }
+  const W=640,H=130,pL=55,pR=20,pT=10,pB=30;
+  const maxU=Math.max(...monthly.map(m=>m.unique_customers),1);
+  const n=monthly.length, xS=(W-pL-pR)/(n>1?n-1:1);
+  const pts=monthly.map((m,i)=>({ x:pL+i*xS, y:pT+(1-m.unique_customers/maxU)*(H-pT-pB), m }));
+  const poly=pts.map(p=>`${p.x.toFixed(0)},${p.y.toFixed(0)}`).join(' ');
+  const fill=poly+` ${pts[pts.length-1].x},${H-pB} ${pts[0].x},${H-pB}`;
+  const dots=pts.map(p=>`
+    <circle cx="${p.x.toFixed(0)}" cy="${p.y.toFixed(0)}" r="4" fill="#a78bfa" stroke="#18213a" stroke-width="1.5"/>
+    <text x="${p.x.toFixed(0)}" y="${(p.y-8).toFixed(0)}" text-anchor="middle" fill="#a78bfa" font-size="9" font-weight="700">${fmt(p.m.unique_customers)}</text>
+    <text x="${p.x.toFixed(0)}" y="${H-pB+16}" text-anchor="middle" fill="#3d5070" font-size="9">${p.m.month_key}</text>`).join('');
+  el('uniq-svg').innerHTML=`<defs><linearGradient id="g3" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#a78bfa" stop-opacity=".22"/><stop offset="100%" stop-color="#a78bfa" stop-opacity=".01"/></linearGradient></defs>
+    <polygon points="${fill}" fill="url(#g3)"/>
+    <polyline points="${poly}" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linejoin="round"/>${dots}`;
+}
+
+function renderUniqTable(monthly) {
+  if(!monthly.length){ html('uniq-table','<div class="loading">No data</div>'); return; }
+  const total=new Set();
+  let runningTotal=0;
+  const rows=monthly.map(m=>{
+    runningTotal+=Number(m.unique_customers);
+    return `<tr><td>${m.month_key}</td><td>${fmt(m.unique_customers)}</td>
+      <td>${fmt(m.orders)}</td>
+      <td>${(m.unique_customers>0?(m.orders/m.unique_customers).toFixed(1):'—')}</td>
+      <td style="color:#a78bfa">${fmt(runningTotal)}</td></tr>`;
+  }).join('');
+  // Note: running total overcounts repeat customers — real unique across months needs distinct
+  html('uniq-table',`<table><thead><tr><th>Month</th><th>Unique Cust</th><th>Orders</th><th>Ord/Cust</th><th>Cumulative*</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div style="font-size:9px;color:#3d5070;margin-top:6px">*Cumulative = sum (may double-count returning customers)</div>`);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  PLATFORM PAGE
+// ════════════════════════════════════════════════════════════════════════════
+function loadPlatform() {
+  const d = (_cache.overview||{});
+  const platforms=d.platforms||[], k=d.kpis||{};
+  if(!platforms.length){ html('pl-kpis','<div class="loading">Load Overview first or Apply filters</div>'); return; }
+
+  html('pl-kpis', platforms.map((p,i)=>`
+    <div class="kpi" style="--kc:${PCOL[p.platform]||COLORS[i]}">
+      <div class="kl">${PLAT[p.platform]||p.platform}</div>
+      <div class="kv">${fmt(p.orders)}</div>
+      <div class="ks">GMV ${fmtK(p.gmv)} · AOV ${fmtR(p.aov)}</div>
+      <div class="ks">Cancel ${p.cancel_rate}% · Coupon ${p.coupon_rate}%</div></div>`).join(''));
+
+  const rows=platforms.map(p=>`
+    <tr><td><span style="color:${PCOL[p.platform]||'#fff'};font-weight:700">${PLAT[p.platform]||p.platform}</span></td>
+        <td>${fmt(p.orders)}</td><td>${fmtK(p.gmv)}</td><td>${fmtK(p.net_revenue)}</td>
+        <td style="color:#34d399;font-weight:700">${fmtR(p.aov)}</td>
+        <td>${p.cancel_rate}%</td><td>${p.coupon_rate}%</td>
+        <td>${pct(p.gmv,k.total_gmv)}</td></tr>`).join('');
+  html('pl-table',`<table><thead><tr><th>Platform</th><th>Orders</th><th>GMV</th><th>Net Rev</th><th>AOV</th><th>Cancel%</th><th>Coupon%</th><th>Share</th></tr></thead><tbody>${rows}</tbody></table>`);
+
+  const maxG=Math.max(...platforms.map(p=>p.gmv),1);
+  el('pl-gmv-svg').setAttribute('viewBox',`0 0 300 ${20+platforms.length*42}`);
+  el('pl-gmv-svg').innerHTML=platforms.map((p,i)=>{
+    const bw=(p.gmv/maxG*205).toFixed(0), y=12+i*42;
+    return `<rect x="82" y="${y}" width="${bw}" height="28" fill="${PCOL[p.platform]||COLORS[i]}" rx="2.5" opacity=".85"/>
+      <text x="78" y="${y+19}" text-anchor="end" fill="#607090" font-size="9.5">${PLAT[p.platform]||p.platform}</text>
+      <text x="${+bw+87}" y="${y+19}" fill="${PCOL[p.platform]||COLORS[i]}" font-size="9.5" font-weight="700">${fmtK(p.gmv)}</text>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  RESTAURANTS
+// ════════════════════════════════════════════════════════════════════════════
+async function loadRestaurants() {
+  startLoad();
+  try {
+    const d = await api('restaurants?'+fp());
+    el('rest-src').textContent = d.source==='agg' ? 'agg ✓' : 'live';
+    const top=d.top||[];
+    if(!top.length){ html('rest-bars','<div class="loading">No data</div>'); return; }
+
+    const maxG=Math.max(...top.map(r=>r.gmv),1);
+    html('rest-bars', top.slice(0,12).map((r,i)=>`
+      <div class="brow"><div class="blbl">${r.name||r.shop_id||'—'}</div>
+      <div class="btrack"><div class="bfill" style="width:${(r.gmv/maxG*100).toFixed(0)}%;background:${GR[i%GR.length]}">
+        <span>${fmtK(r.gmv)} · ${fmt(r.orders)}</span></div></div></div>`).join(''));
+
+    const topAOV=top.reduce((a,b)=>Number(b.aov)>Number(a.aov)?b:a, top[0]);
+    html('rest-kpis',`
+      <div class="kpi blue"><div class="kl">Restaurants</div><div class="kv">${top.length}</div><div class="ks">in period</div></div>
+      <div class="kpi green"><div class="kl">#1 by GMV</div><div class="kv">${(top[0].name||'—').slice(0,18)}</div><div class="ks">${fmtK(top[0].gmv)} · ${fmt(top[0].orders)} orders</div></div>
+      <div class="kpi orange"><div class="kl">Highest AOV</div><div class="kv">${(topAOV.name||'—').slice(0,18)}</div><div class="ks">${fmtR(topAOV.aov)}</div></div>
+      <div class="kpi purple"><div class="kl">Total GMV</div><div class="kv">${fmtK(top.reduce((s,r)=>s+Number(r.gmv),0))}</div><div class="ks">all combined</div></div>`);
+
+    const rows=top.slice(0,20).map(r=>{
+      const status=Number(r.orders)>100?'★ Top':Number(r.orders)>50?'Active':Number(r.orders)>20?'Growing':'Low';
+      const cls=Number(r.orders)>100?'pg':Number(r.orders)>50?'pb':Number(r.orders)>20?'po':'pr';
+      return `<tr><td>${r.name||r.shop_id||'—'}</td><td>${fmt(r.orders)}</td><td>${fmtR(r.aov)}</td>
+        <td>${fmtK(r.gmv)}</td><td>${fmtK(r.net_revenue)}</td>
+        <td>${r.cancel_rate||0}%</td><td>${fmt(r.coupon_orders)}</td>
+        <td><span class="pill ${cls}">${status}</span></td></tr>`;
+    }).join('');
+    html('rest-table',`<table><thead><tr><th>Restaurant</th><th>Orders</th><th>AOV</th><th>GMV</th><th>Net Rev</th><th>Cancel%</th><th>Coupon</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`);
+  } finally { endLoad(); }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  FUNNEL
+// ════════════════════════════════════════════════════════════════════════════
+async function loadFunnel() {
+  startLoad();
+  try {
+    const d = await api('funnel?'+fp());
+    const stages=d.stages||[];
+    if(!stages.length){ html('fn-wrap','<div class="loading">No funnel data in fact_funnel</div>'); html('fn-kpis',''); return; }
+    const SCOL2=['#a78bfa','#5b9cf6','#34d399','#fb923c','#f87171'];
+    const top=stages[0]?.total||1;
+    html('fn-kpis',`
+      <div class="kpi purple"><div class="kl">${stages[0]?.stage_name} (Top)</div><div class="kv">${fmt(top)}</div><div class="ks">raw events</div></div>
+      <div class="kpi green"><div class="kl">Orders (end)</div><div class="kv">${fmt(stages[stages.length-1]?.total)}</div><div class="ks">ACTION=ORDER</div></div>
+      <div class="kpi blue"><div class="kl">Overall Conv.</div><div class="kv">${pct(stages[stages.length-1]?.total,top)}</div><div class="ks">Top→ORDER</div></div>`);
+    html('fn-wrap', stages.map((s,i)=>{
+      const w=top>0?(s.total/top*100).toFixed(0):0;
+      const prev=i>0?stages[i-1].total:s.total;
+      const drop=i>0?((1-s.total/prev)*100).toFixed(1):null;
+      return `${drop?`<div class="farrow">▼ ${drop}% drop-off</div>`:''}
+        <div class="fstage"><div class="flbl">${s.stage_name}</div>
+        <div class="fouter"><div class="finner" style="width:${w}%;background:${SCOL2[i]}1a;border-left:3px solid ${SCOL2[i]}">
+          <span class="fcnt">${fmt(s.total)}</span><span class="fpct">${pct(s.total,top)}</span>
+        </div></div></div>`;
+    }).join(''));
+    const drops=stages.slice(1).map((s,i)=>({ lbl:`${stages[i].stage_name}→${s.stage_name}`, dropped:stages[i].total-s.total, pctV:((1-s.total/stages[i].total)*100).toFixed(1) }));
+    const maxD=Math.max(...drops.map(d=>d.dropped),1);
+    html('fn-drops', drops.map((d,i)=>`
+      <div class="brow"><div class="blbl" style="width:150px;font-size:10px">${d.lbl}</div>
+      <div class="btrack"><div class="bfill" style="width:${(d.dropped/maxD*100).toFixed(0)}%;background:${GR[i%GR.length]}">
+        <span>-${fmt(d.dropped)} (${d.pctV}%)</span></div></div></div>`).join(''));
+    const c=d.conversion||{};
+    if(c.overall_conversion_rate) el('fn-rates').innerHTML=`<strong>Pre-computed Rates (agg_funnel_conversion)</strong>PLP→Cart ${c.plp_to_cart_rate||'—'}% · Cart→CX ${c.cart_to_checkout_rate||'—'}% · CX→Order ${c.checkout_to_order_rate||'—'}% · <strong>Overall ${c.overall_conversion_rate}%</strong>`;
+  } finally { endLoad(); }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  CUSTOMERS (Req 4, 7, 8)
+// ════════════════════════════════════════════════════════════════════════════
+let _custData = null;
+async function loadCustomers() {
+  startLoad();
+  try {
+    const d = await api('customers?'+fp());
+    _custData = d;
+    const total=(d.segments||[]).reduce((s,r)=>s+Number(r.cnt),0);
+    html('cu-kpis',`
+      <div class="kpi blue"><div class="kl">Total Customers</div><div class="kv">${fmt(total)}</div><div class="ks">agg_customer_behavior</div></div>
+      <div class="kpi red"><div class="kl">VIP (≥10 orders)</div><div class="kv">${fmt((d.segments||[]).find(s=>s.customer_segment==='VIP')?.cnt||0)}</div></div>
+      <div class="kpi orange"><div class="kl">Loyal (5–9)</div><div class="kv">${fmt((d.segments||[]).find(s=>s.customer_segment==='Loyal')?.cnt||0)}</div></div>
+      <div class="kpi purple"><div class="kl">One-time</div><div class="kv">${fmt((d.segments||[]).find(s=>s.customer_segment==='One-time')?.cnt||0)}</div></div>`);
+
+    html('seg-grid',(d.segments||[]).map(s=>`
+      <div class="seg-box" style="background:${SBGC[s.customer_segment]||'rgba(255,255,255,.04)'};border-color:${SCOL[s.customer_segment]||'#1e2a42'}44">
+        <div class="seg-n" style="color:${SCOL[s.customer_segment]||'#fff'}">${fmt(s.cnt)}</div>
+        <div class="seg-l">${s.customer_segment}</div>
+        <div class="seg-s">${fmtK(s.gmv)} · avg ${s.avg_orders} orders</div>
+      </div>`).join(''));
+
+    // Req 4: unique users chart
+    renderCustUniq(d.uniqueByMonth||[]);
+
+    // Req 7: month frequency nav
+    buildMonthNav(d.ordersPerUserMonth||[]);
+
+    // Coupon
+    const wC=(d.coupon||[]).find(c=>Number(c.has_coupon)===1)||{orders:0,aov:0,total_discount:0};
+    const noC=(d.coupon||[]).find(c=>Number(c.has_coupon)===0)||{orders:0,aov:0};
+    const tc=Number(wC.orders)+Number(noC.orders)||1;
+    html('coupon-wrap',`<div class="two-col">
+      <div style="background:#0f1525;border-radius:8px;padding:13px;text-align:center">
+        <div style="font-size:10px;color:#3d5070;margin-bottom:5px;text-transform:uppercase">With Coupon</div>
+        <div style="font-size:24px;font-weight:800;color:#fb923c">${pct(wC.orders,tc)}</div>
+        <div style="font-size:10px;color:#3d5070">${fmt(wC.orders)} orders</div>
+        <div style="font-size:13px;color:#d4dff0;margin-top:7px;font-weight:700">AOV ${fmtR(wC.aov)}</div>
+        <div style="font-size:10px;color:#fb923c">Discount: ${fmtK(wC.total_discount)}</div>
+      </div>
+      <div style="background:#0f1525;border-radius:8px;padding:13px;text-align:center">
+        <div style="font-size:10px;color:#3d5070;margin-bottom:5px;text-transform:uppercase">No Coupon</div>
+        <div style="font-size:24px;font-weight:800;color:#5b9cf6">${pct(noC.orders,tc)}</div>
+        <div style="font-size:10px;color:#3d5070">${fmt(noC.orders)} orders</div>
+        <div style="font-size:13px;color:#d4dff0;margin-top:7px;font-weight:700">AOV ${fmtR(noC.aov)}</div>
+        <div style="font-size:10px;color:#34d399">+${fmtR(Math.max(0,noC.aov-wC.aov))} higher ↑</div>
+      </div></div>`);
+
+    const rv=(d.repeatVsNew||[]).find(r=>r.buyer_type==='repeat')||{customers:0,gmv:0};
+    const nv=(d.repeatVsNew||[]).find(r=>r.buyer_type==='new')||{customers:0,gmv:0};
+    const tg=Number(rv.gmv)+Number(nv.gmv)||1;
+    html('repeat-wrap',`
+      <div style="display:flex;flex-direction:column;gap:8px;padding:4px 0">
+        <div style="background:#34d39914;border-radius:8px;padding:12px">
+          <div style="font-size:11px;color:#34d399;font-weight:700;margin-bottom:3px">Repeat — ${fmt(rv.customers)} customers</div>
+          <div style="font-size:20px;font-weight:800;color:#34d399">${fmtK(rv.gmv)}</div>
+          <div style="font-size:10px;color:#3d5070">${pct(rv.gmv,tg)} of GMV</div>
+        </div>
+        <div style="background:#a78bfa14;border-radius:8px;padding:12px">
+          <div style="font-size:11px;color:#a78bfa;font-weight:700;margin-bottom:3px">New — ${fmt(nv.customers)} customers</div>
+          <div style="font-size:20px;font-weight:800;color:#a78bfa">${fmtK(nv.gmv)}</div>
+          <div style="font-size:10px;color:#3d5070">${pct(nv.gmv,tg)} of GMV</div>
+        </div>
+      </div>`);
+
+    // Req 8: Lifetime orders per user table
+    const tRows=(d.ordersPerUserTotal||[]).map(c=>`
+      <tr><td>${c.customer_name&&c.customer_name!=='—'?c.customer_name:'—'}</td>
+          <td style="font-family:monospace;font-size:10px">${c.customer_contact||'—'}</td>
+          <td>${fmt(c.total_orders)}</td>
+          <td><span class="pill ${c.customer_segment==='VIP'?'pg':c.customer_segment==='Loyal'?'po':c.customer_segment==='Repeat'?'pb':'pp'}">${c.customer_segment}</span></td>
+          <td>${fmtK(c.total_gmv)}</td>
+          <td>${c.first_order_date||'—'}</td>
+          <td>${c.last_order_date||'—'}</td></tr>`).join('');
+    html('top-cust',`<table><thead><tr><th>Name</th><th>Contact</th><th>Total Orders</th><th>Segment</th><th>Lifetime GMV</th><th>First Order</th><th>Last Order</th></tr></thead>
+      <tbody>${tRows||'<tr><td colspan="7" class="loading">No data</td></tr>'}</tbody></table>`);
+  } finally { endLoad(); }
+}
+
+function renderCustUniq(uniqByMonth) {
+  if(!uniqByMonth.length){ el('cu-uniq-svg').innerHTML='<text x="320" y="75" text-anchor="middle" fill="#3d5070" font-size="12">No data</text>'; html('uniq-cust-table',''); return; }
+  const W=640,H=120,pL=50,pR=20,pT=8,pB=28;
+  const maxU=Math.max(...uniqByMonth.map(m=>m.unique_users),1);
+  const n=uniqByMonth.length, xS=(W-pL-pR)/(n>1?n-1:1);
+  const pts=uniqByMonth.map((m,i)=>({ x:pL+i*xS, y:pT+(1-m.unique_users/maxU)*(H-pT-pB), m }));
+  const poly=pts.map(p=>`${p.x.toFixed(0)},${p.y.toFixed(0)}`).join(' ');
+  const dots=pts.map(p=>`
+    <circle cx="${p.x.toFixed(0)}" cy="${p.y.toFixed(0)}" r="4" fill="#a78bfa" stroke="#18213a" stroke-width="1.5"/>
+    <text x="${p.x.toFixed(0)}" y="${(p.y-7).toFixed(0)}" text-anchor="middle" fill="#a78bfa" font-size="8.5" font-weight="700">${fmt(p.m.unique_users)}</text>
+    <text x="${p.x.toFixed(0)}" y="${H-pB+15}" text-anchor="middle" fill="#3d5070" font-size="8.5">${p.m.month_key}</text>`).join('');
+  el('cu-uniq-svg').innerHTML=`<polyline points="${poly}" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linejoin="round"/>${dots}`;
+
+  const rows=uniqByMonth.map(m=>`
+    <tr><td>${m.month_key}</td><td style="color:#a78bfa;font-weight:700">${fmt(m.unique_users)}</td>
+        <td>${fmt(m.orders)}</td>
+        <td>${m.unique_users>0?(m.orders/m.unique_users).toFixed(1):'—'}</td></tr>`).join('');
+  html('uniq-cust-table',`<table><thead><tr><th>Month</th><th>Unique Users</th><th>Orders</th><th>Ord/User</th></tr></thead><tbody>${rows}</tbody></table>`);
+}
+
+// Req 7: orders per user per month
+function buildMonthNav(opum) {
+  const months=[...new Set(opum.map(r=>r.month_key))].sort();
+  html('month-nav', months.map((m,i)=>`<div class="month-btn${i===months.length-1?' active':''}" onclick="selectMonth('${m}',this)">${m}</div>`).join(''));
+  if(months.length) renderMonthFreq(opum, months[months.length-1]);
+}
+
+function selectMonth(mk, btn) {
+  document.querySelectorAll('.month-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if(_custData) renderMonthFreq(_custData.ordersPerUserMonth||[], mk);
+}
+
+function renderMonthFreq(opum, mk) {
+  const rows=opum.filter(r=>r.month_key===mk);
+  if(!rows.length){ html('freq-bars','<div class="loading">No data for this month</div>'); html('freq-table',''); return; }
+  // distribution: how many users ordered 1x, 2x, 3x, 4+x
+  const dist={};
+  rows.forEach(r=>{ const k=r.order_count>=4?'4+':String(r.order_count); dist[k]=(dist[k]||0)+1; });
+  const ordered=['1','2','3','4+'];
+  const maxV=Math.max(...Object.values(dist),1);
+  html('freq-bars', ordered.map((k,i)=>`
+    <div class="brow"><div class="blbl" style="width:80px">${k}× orders</div>
+    <div class="btrack"><div class="bfill" style="width:${((dist[k]||0)/maxV*100).toFixed(0)}%;background:${GR[i]}">
+      <span>${fmt(dist[k]||0)} users</span></div></div></div>`).join(''));
+  // top ordering users this month
+  const top10=rows.slice(0,10);
+  const tbl=top10.map(r=>`<tr><td style="font-family:monospace;font-size:10px">${r.customer_contact||'—'}</td><td>${r.order_count}</td></tr>`).join('');
+  html('freq-table',`<div style="font-size:10px;color:#3d5070;margin-bottom:6px">Top users — ${mk}</div>
+    <table><thead><tr><th>Contact</th><th>Orders</th></tr></thead><tbody>${tbl}</tbody></table>`);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  PRODUCTS (Req 5: top 10 per month per restaurant)
+// ════════════════════════════════════════════════════════════════════════════
+let _prodData = null;
+async function loadProducts() {
+  startLoad();
+  try {
+    const d = await api('products?'+fp());
+    _prodData = d;
+    html('pr-kpis',`
+      <div class="kpi blue"><div class="kl">Total Items Sold</div><div class="kv">${fmt(d.totalLineItems)}</div><div class="ks">fact_order_items</div></div>
+      <div class="kpi green"><div class="kl">Top App Item</div><div class="kv" style="font-size:14px">${d.appItems[0]?.product_name||'—'}</div><div class="ks">${fmt(d.appItems[0]?.qty||0)} orders · ${d.appItems[0]?.restaurant_name||''}</div></div>
+      <div class="kpi orange"><div class="kl">Top GF Item</div><div class="kv" style="font-size:14px">${d.gfItems[0]?.product_name||'—'}</div><div class="ks">${fmt(d.gfItems[0]?.qty||0)} orders</div></div>`);
+
+    const renderItemBars = (items, containerId) => {
+      const max=Math.max(...items.map(i=>i.qty),1);
+      html(containerId, items.length
+        ? items.map((it,i)=>`<div class="brow"><div class="blbl">${it.product_name||'—'}</div>
+            <div class="btrack"><div class="bfill" style="width:${(it.qty/max*100).toFixed(0)}%;background:${GR[i%GR.length]}">
+              <span>${fmt(it.qty)}</span></div></div></div>`).join('')
+        : '<div class="loading">No data</div>');
+    };
+    renderItemBars(d.appItems, 'app-items');
+    renderItemBars(d.gfItems, 'gf-items');
+    renderItemBars(d.waItems, 'wa-items');
+
+    const maxR=Math.max(...(d.byRestaurant||[]).map(r=>r.qty),1);
+    html('rest-items',(d.byRestaurant||[]).map((r,i)=>`
+      <div class="brow"><div class="blbl">${r.restaurant_name||r.shop_id||'—'}</div>
+      <div class="btrack"><div class="bfill" style="width:${(r.qty/maxR*100).toFixed(0)}%;background:${GR[i%GR.length]}">
+        <span>${fmt(r.qty)}</span></div></div></div>`).join(''));
+
+    // Populate per-month-per-restaurant dropdowns
+    buildProductDropdowns(d.topByRestaurantMonth||[]);
+    renderTopByRestMonth();
+  } finally { endLoad(); }
+}
+
+function buildProductDropdowns(items) {
+  const months=[...new Set(items.map(i=>i.month_key))].sort();
+  const rests=[...new Map(items.map(i=>[i.shop_id,i.restaurant_name])).entries()];
+  const mSel=el('pr-month'), rSel=el('pr-rest');
+  // Clear existing dynamic options
+  while(mSel.options.length>1) mSel.remove(1);
+  while(rSel.options.length>1) rSel.remove(1);
+  months.forEach(m=>{ const o=document.createElement('option'); o.value=m; o.textContent=m; mSel.appendChild(o); });
+  rests.forEach(([sid,rn])=>{ const o=document.createElement('option'); o.value=sid; o.textContent=rn||sid; rSel.appendChild(o); });
+}
+
+function renderTopByRestMonth() {
+  if(!_prodData) return;
+  const items=_prodData.topByRestaurantMonth||[];
+  const mk=el('pr-month').value, sid=el('pr-rest').value;
+  let filtered=items;
+  if(mk) filtered=filtered.filter(i=>i.month_key===mk);
+  if(sid) filtered=filtered.filter(i=>i.shop_id===sid);
+  // Top 10 items from this slice
+  const agg={};
+  filtered.forEach(i=>{ agg[i.product_name]=(agg[i.product_name]||0)+Number(i.qty); });
+  const top10=Object.entries(agg).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  if(!top10.length){ html('rest-month-bars','<div class="loading">No data for this selection</div>'); return; }
+  const maxQ=top10[0][1];
+  html('rest-month-bars', top10.map(([name,qty],i)=>`
+    <div class="brow"><div class="blbl">${name}</div>
+    <div class="btrack"><div class="bfill" style="width:${(qty/maxQ*100).toFixed(0)}%;background:${GR[i%GR.length]}">
+      <span>${fmt(qty)} orders</span></div></div></div>`).join(''));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  P&L
+// ════════════════════════════════════════════════════════════════════════════
+async function loadPnl() {
+  startLoad();
+  try {
+    const d = await api('pnl?'+fp());
+    const t=d.totals||{};
+    const totalDisc=Number(t.menu_discount||0)+Number(t.cart_discount||0)+Number(t.coupon_value||0);
+    const totalCh  =Number(t.packing_charge||0)+Number(t.delivery_charge||0)+Number(t.convenience_charge||0)+Number(t.tax||0);
+    html('pnl-kpis',`
+      <div class="kpi green"><div class="kl">Gross GMV</div><div class="kv">${fmtK(t.gmv)}</div><div class="ks">SUM(order_value)</div></div>
+      <div class="kpi blue"><div class="kl">Net Revenue</div><div class="kv">${fmtK(t.net_revenue)}</div><div class="ks">GMV − discount</div></div>
+      <div class="kpi red"><div class="kl">Total Discounts</div><div class="kv">${fmtK(totalDisc)}</div><div class="ks">Menu+Cart+Coupon</div></div>
+      <div class="kpi orange"><div class="kl">Add-on Charges</div><div class="kv">${fmtK(totalCh)}</div><div class="ks">Pack+Del+Conv+Tax</div></div>`);
+
+    const rows=(d.monthly||[]).map(m=>`
+      <tr><td>${m.month_key}</td>
+          <td style="color:#34d399;font-weight:700">${fmtK(m.gmv)}</td>
+          <td style="color:#f87171">-${fmtK(Number(m.menu_discount||0)+Number(m.cart_discount||0)+Number(m.coupon_value||0))}</td>
+          <td style="color:#5b9cf6">+${fmtK(m.packing_charge)}</td>
+          <td style="color:#5b9cf6">+${fmtK(m.delivery_charge)}</td>
+          <td style="color:#a78bfa">+${fmtK(m.tax)}</td>
+          <td style="color:#d4dff0;font-weight:700">${fmtK(m.net_revenue)}</td>
+          <td>${fmt(m.orders)}</td>
+          <td>${fmtR(m.aov)}</td></tr>`).join('');
+    html('pnl-table',`<table><thead><tr><th>Month</th><th>GMV</th><th>Discounts</th><th>Packing</th><th>Delivery</th><th>Tax</th><th>Net Revenue</th><th>Orders</th><th>AOV</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="9" class="loading">No data</td></tr>'}</tbody></table>`);
+
+    const items=[
+      {l:'GMV',v:Number(t.gmv||0),c:'#34d399'},
+      {l:'Menu Disc',v:-Number(t.menu_discount||0),c:'#f87171'},
+      {l:'Cart Disc',v:-Number(t.cart_discount||0),c:'#f87171'},
+      {l:'Coupon',v:-Number(t.coupon_value||0),c:'#fb923c'},
+      {l:'Packing',v:Number(t.packing_charge||0),c:'#5b9cf6'},
+      {l:'Delivery',v:Number(t.delivery_charge||0),c:'#38bdf8'},
+      {l:'Tax',v:Number(t.tax||0),c:'#a78bfa'},
+      {l:'Net Rev',v:Number(t.net_revenue||0),c:'#34d399'},
+    ].filter(i=>Math.abs(i.v)>0);
+    const maxV=Math.max(...items.map(i=>Math.abs(i.v)),1);
+    const bww=Math.floor(270/items.length);
+    el('pnl-svg').innerHTML=items.map((it,i)=>{
+      const bh=Math.max(Math.round(Math.abs(it.v)/maxV*130),3);
+      const x=10+i*bww, y=145-bh;
+      return `<rect x="${x}" y="${y}" width="${bww-3}" height="${bh}" fill="${it.c}" rx="2" opacity="${it.v<0?.5:.85}"/>
+        <text x="${x+(bww-3)/2}" y="${y-4}" text-anchor="middle" fill="${it.c}" font-size="7" font-weight="700">${fmtK(Math.abs(it.v))}</text>
+        <text x="${x+(bww-3)/2}" y="160" text-anchor="middle" fill="#3d5070" font-size="7">${it.l}</text>`;
+    }).join('');
+  } finally { endLoad(); }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  ROUTER
+// ════════════════════════════════════════════════════════════════════════════
+const LOADERS = {
+  overview:    loadOverview,
+  trends:      loadTrends,
+  platform:    () => { loadPlatform(); return Promise.resolve(); },
+  restaurants: loadRestaurants,
+  funnel:      loadFunnel,
+  customers:   loadCustomers,
+  products:    loadProducts,
+  pnl:         loadPnl,
+  restaov:     loadRestAOV,
+  onetimers:   loadOneTimers,
+  funnelab:    loadFunnelAb,
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+//  PAGE 9 — RESTAURANT AOV DEEP-DIVE
+// ════════════════════════════════════════════════════════════════════════════
+async function loadRestAOV() {
+  startLoad();
+  try {
+    const p = new URLSearchParams();
+    const restName = el('ra-rest-name')?.value;
+    const platform = el('ra-platform')?.value;
+    const from     = el('ra-from')?.value;
+    const to       = el('ra-to')?.value;
+    if (restName) p.set('restaurant_name_like', restName);
+    if (platform) p.set('platform', platform);
+    if (from)     p.set('from', from);
+    if (to)       p.set('to', to);
+
+    const d = await api('restaurant_aov?' + p);
+    const s = d.summary || {};
+    const monthly = d.monthly || [];
+
+    if (!monthly.length) {
+      html('ra-kpis', '<div class="loading">No data found — check restaurant name or date range</div>');
+      return;
+    }
+
+    html('ra-kpis', `
+      <div class="kpi blue"><div class="kl">Restaurant</div><div class="kv" style="font-size:14px">${s.restaurant_name||'—'}</div><div class="ks">${PLAT[s.platform]||s.platform||'—'}</div></div>
+      <div class="kpi green"><div class="kl">Total Orders</div><div class="kv">${fmt(s.total_orders)}</div><div class="ks">Excl. cancelled</div></div>
+      <div class="kpi orange"><div class="kl">AOV Food + Packing</div><div class="kv">${fmtR(s.aov_food_plus_packing)}</div><div class="ks">Your requirement</div></div>
+      <div class="kpi teal"><div class="kl">AOV Food Only</div><div class="kv">${fmtR(s.aov_food_only)}</div><div class="ks">Excl. packing too</div></div>
+      <div class="kpi"><div class="kl">Gross AOV</div><div class="kv">${fmtR(s.aov_gross)}</div><div class="ks">Full order_value</div></div>
+      <div class="kpi"><div class="kl">Total GMV</div><div class="kv">${fmtK(s.total_gmv)}</div><div class="ks">Period total</div></div>`);
+
+    // SVG trend — 3 lines: gross, food+pack, food only
+    renderRestAOVChart(monthly);
+
+    // Table
+    const rows = monthly.map(m => `
+      <tr>
+        <td>${m.month_key}</td>
+        <td>${fmt(m.order_count)}</td>
+        <td class="num highlight">${fmtR(m.aov_gross)}</td>
+        <td class="num" style="color:#fb923c;font-weight:700">${fmtR(m.aov_food_plus_packing)}</td>
+        <td class="num" style="color:#34d399;font-weight:700">${fmtR(m.aov_food_only)}</td>
+        <td class="num">${fmtR(m.avg_packing)}</td>
+        <td class="num">${fmtR(m.avg_delivery)}</td>
+        <td class="num">${fmtR(m.avg_tax)}</td>
+      </tr>`).join('');
+    html('ra-table', `<table>
+      <thead><tr><th>Month</th><th>Orders</th><th>Gross AOV</th><th>Food+Pack AOV</th><th>Food Only AOV</th><th>Avg Packing</th><th>Avg Delivery</th><th>Avg Tax</th></tr></thead>
+      <tbody>${rows}</tbody></table>`);
+  } finally { endLoad(); }
+}
+
+function renderRestAOVChart(monthly) {
+  if (!monthly.length) return;
+  const W=640,H=150,pL=65,pR=25,pT=12,pB=35;
+  const maxV = Math.max(...monthly.map(m => m.aov_gross), 1);
+  const n = monthly.length, xS = (W-pL-pR)/(n>1?n-1:1);
+  const mkPts = key => monthly.map((m,i) => ({ x: pL+i*xS, y: pT+(1-m[key]/maxV)*(H-pT-pB), v: m[key], m }));
+
+  const gross = mkPts('aov_gross');
+  const food_pack = mkPts('aov_food_plus_packing');
+  const food_only = mkPts('aov_food_only');
+
+  const line = (pts, col, dash='') =>
+    `<polyline points="${pts.map(p=>`${p.x.toFixed(0)},${p.y.toFixed(0)}`).join(' ')}"
+       fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" ${dash}/>`;
+
+  const dots = (pts, col) => pts.map(p =>
+    `<circle cx="${p.x.toFixed(0)}" cy="${p.y.toFixed(0)}" r="4" fill="${col}" stroke="#18213a" stroke-width="1.5"/>
+     <text x="${p.x.toFixed(0)}" y="${(p.y-8).toFixed(0)}" text-anchor="middle" fill="${col}" font-size="8.5" font-weight="700">${fmtR(p.v)}</text>`
+  ).join('');
+
+  const xlbl = monthly.map((m,i) =>
+    `<text x="${(pL+i*xS).toFixed(0)}" y="${H-pB+16}" text-anchor="middle" fill="#3d5070" font-size="9">${m.month_key}</text>`
+  ).join('');
+
+  const legend = `
+    <line x1="${pL}" y1="${H-pB+26}" x2="${pL+18}" y2="${H-pB+26}" stroke="#5b9cf6" stroke-width="2"/>
+    <text x="${pL+22}" y="${H-pB+30}" fill="#3d5070" font-size="8.5">Gross</text>
+    <line x1="${pL+65}" y1="${H-pB+26}" x2="${pL+83}" y2="${H-pB+26}" stroke="#fb923c" stroke-width="2"/>
+    <text x="${pL+87}" y="${H-pB+30}" fill="#3d5070" font-size="8.5">Food+Pack</text>
+    <line x1="${pL+155}" y1="${H-pB+26}" x2="${pL+173}" y2="${H-pB+26}" stroke="#34d399" stroke-width="2" stroke-dasharray="4,2"/>
+    <text x="${pL+177}" y="${H-pB+30}" fill="#3d5070" font-size="8.5">Food Only</text>`;
+
+  el('ra-svg').innerHTML = line(gross,'#5b9cf6') + line(food_pack,'#fb923c') +
+    line(food_only,'#34d399','stroke-dasharray="4,3"') +
+    dots(gross,'#5b9cf6') + dots(food_pack,'#fb923c') + dots(food_only,'#34d399') +
+    xlbl + legend;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  PAGE 10 — ONE-TIME USERS + WhatsApp Numbers
+// ════════════════════════════════════════════════════════════════════════════
+let _otData = null;
+
+async function loadOneTimers() {
+  startLoad();
+  try {
+    const p = new URLSearchParams();
+    const platform = el('ot-platform')?.value;
+    const from     = el('ot-from')?.value;
+    const to       = el('ot-to')?.value;
+    const shop_id  = el('ot-rest')?.value;
+    if (platform) p.set('platform', platform);
+    if (from)     p.set('from', from);
+    if (to)       p.set('to', to);
+    if (shop_id)  p.set('shop_id', shop_id);
+
+    const d = await api('onetime_users_swayo?' + p);
+    _otData = d;
+
+    html('ot-kpis', `
+      <div class="kpi blue"><div class="kl">One-Time Users</div><div class="kv">${fmt(d.count)}</div><div class="ks">Ordered exactly once (lifetime)</div></div>
+      <div class="kpi orange"><div class="kl">Platform</div><div class="kv" style="font-size:14px">${PLAT[platform]||'All'}</div><div class="ks">${from||'all time'} → ${to||'now'}</div></div>
+      <div class="kpi purple"><div class="kl">Win-Back Potential</div><div class="kv">${fmt(d.count)}</div><div class="ks">Each has WA number below</div></div>`);
+
+    if (!d.users || !d.users.length) {
+      html('ot-table', '<div class="loading">No one-time users found for selected filters</div>');
+      return;
+    }
+
+    const rows = d.users.map((u, i) => `
+      <tr>
+        <td>${i+1}</td>
+        <td style="font-family:monospace;font-size:11px;color:#34d399;font-weight:700">
+          ${u.whatsapp_number || '—'}
+        </td>
+        <td>${u.customer_name && u.customer_name !== '—' ? u.customer_name : '—'}</td>
+        <td>${u.order_date || '—'}</td>
+        <td>${PLAT[u.platform]||u.platform||'—'}</td>
+        <td>${u.restaurant_name || '—'}</td>
+        <td class="num highlight">${fmtR(u.order_value)}</td>
+        <td>${u.order_status || '—'}</td>
+        <td>${u.delivery_type || '—'}</td>
+      </tr>`).join('');
+
+    html('ot-table', `<table>
+      <thead><tr>
+        <th>#</th><th>WhatsApp / Contact</th><th>Name</th><th>Order Date</th>
+        <th>Platform</th><th>Restaurant</th><th>Order Value</th><th>Status</th><th>Type</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`);
+  } finally { endLoad(); }
+}
+
+function exportOneTimers(format) {
+  const p = new URLSearchParams();
+  p.set('export_type', 'customers');
+  p.set('customer_segment', 'One-time');
+  const platform = el('ot-platform')?.value;
+  const from     = el('ot-from')?.value;
+  const to       = el('ot-to')?.value;
+  const shop_id  = el('ot-rest')?.value;
+  if (platform) p.set('platform', platform);
+  if (from)     p.set('from', from);
+  if (to)       p.set('to', to);
+  if (shop_id)  p.set('shop_id', shop_id);
+  p.set('min_orders', '1');
+  p.set('max_orders', '1');
+  p.set('limit', '10000');
+  const a = document.createElement('a');
+  a.href = `${API}/api/export/${format}?${p}`;
+  a.click();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  PAGE 11 — JFP ABANDONED CARTS FUNNEL
+// ════════════════════════════════════════════════════════════════════════════
+let _faData = null;
+
+async function loadFunnelAb() {
+  startLoad();
+  try {
+    const p = new URLSearchParams();
+    const shop_id   = el('fa-rest')?.value;
+    const from      = el('fa-from')?.value;
+    const to        = el('fa-to')?.value;
+    const threshold = el('fa-threshold')?.value || '9';
+    if (shop_id)   p.set('shop_id', shop_id);
+    if (from)      p.set('from', from);
+    if (to)        p.set('to', to);
+    p.set('team_threshold', threshold);
+    el('fa-threshold-shown').textContent = threshold;
+
+    const d = await api('funnel_abandoned?' + p);
+    _faData = d;
+    const s = d.summary || {};
+
+    // Real conversion: abandoned / (abandoned + ordered) — team excluded
+    const realTotal     = s.abandoned_to_call + s.ordered_customers;
+    const convPct       = realTotal > 0 ? (s.ordered_customers / realTotal * 100).toFixed(1) : '—';
+    const standardTotal = realTotal + s.likely_team_filtered_out;
+    const skewedPct     = standardTotal > 0 ? (s.ordered_customers / standardTotal * 100).toFixed(1) : '—';
+
+    html('fa-kpis', `
+      <div class="kpi blue"><div class="kl">Total VIEW_CART</div><div class="kv">${fmt(s.total_view_cart_customers)}</div><div class="ks">Unique customers in period</div></div>
+      <div class="kpi red"><div class="kl">📞 Call These</div><div class="kv">${fmt(s.abandoned_to_call)}</div><div class="ks">Viewed cart, didn't order</div></div>
+      <div class="kpi green"><div class="kl">✅ Ordered</div><div class="kv">${fmt(s.ordered_customers)}</div><div class="ks">Converted to order</div></div>
+      <div class="kpi orange"><div class="kl">🏢 Team (filtered)</div><div class="kv">${fmt(s.likely_team_filtered_out)}</div><div class="ks">VIEW_CART ≥ ${threshold} — excluded</div></div>
+      <div class="kpi purple"><div class="kl">Real Conv. Rate</div><div class="kv">${convPct}%</div><div class="ks">Excl. team carts</div></div>`);
+
+    // Show corrected note
+    el('fa-corrected-note').style.display = 'block';
+    el('fa-corrected-text').innerHTML = `
+      &nbsp;<strong>Skewed rate</strong> (incl. team): ${skewedPct}% &nbsp;|&nbsp;
+      <strong>Real rate</strong> (excl. team VIEW_CARTs ≥ ${threshold}): ${convPct}%
+      &nbsp;—&nbsp; difference of ${(Number(convPct)-Number(skewedPct)).toFixed(1)}pp`;
+
+    // Abandoned table — CALL THESE
+    if (d.abandoned && d.abandoned.length) {
+      const rows = d.abandoned.map((c,i) => `
+        <tr>
+          <td>${i+1}</td>
+          <td style="font-family:monospace;font-size:11px;color:#f87171;font-weight:700">${c.customer_contact||'—'}</td>
+          <td>${c.customer_name&&c.customer_name!=='—'?c.customer_name:'—'}</td>
+          <td class="num">${fmt(c.view_cart_count)}</td>
+          <td style="font-size:10px;color:#607090">${c.first_view||'—'}</td>
+          <td style="font-size:10px;color:#607090">${c.last_view||'—'}</td>
+        </tr>`).join('');
+      html('fa-abandoned', `<table>
+        <thead><tr><th>#</th><th>Contact (WA)</th><th>Name</th><th>Cart Views</th><th>First View</th><th>Last View</th></tr></thead>
+        <tbody>${rows}</tbody></table>`);
+    } else {
+      html('fa-abandoned', '<div class="loading">No abandoned cart customers found</div>');
+    }
+
+    // Ordered table
+    if (d.ordered && d.ordered.length) {
+      const rows = d.ordered.map((c,i) => `
+        <tr>
+          <td>${i+1}</td>
+          <td style="font-family:monospace;font-size:11px;color:#34d399">${c.customer_contact||'—'}</td>
+          <td>${c.customer_name&&c.customer_name!=='—'?c.customer_name:'—'}</td>
+          <td class="num" style="color:#fb923c">${fmt(c.view_cart_count)}</td>
+        </tr>`).join('');
+      html('fa-ordered', `<table>
+        <thead><tr><th>#</th><th>Contact</th><th>Name</th><th>Cart Views</th></tr></thead>
+        <tbody>${rows}</tbody></table>`);
+    } else {
+      html('fa-ordered', '<div class="loading">No ordered customers in period</div>');
+    }
+
+    // Team table
+    if (d.likely_team && d.likely_team.length) {
+      const rows = d.likely_team.map((c,i) => `
+        <tr>
+          <td style="font-family:monospace;font-size:10px;color:#fb923c">${c.customer_contact||'—'}</td>
+          <td>${c.customer_name&&c.customer_name!=='—'?c.customer_name:'—'}</td>
+          <td class="num" style="color:#fb923c;font-weight:700">${fmt(c.view_cart_count)}</td>
+        </tr>`).join('');
+      html('fa-team', `<table>
+        <thead><tr><th>Contact</th><th>Name</th><th>Cart Views</th></tr></thead>
+        <tbody>${rows}</tbody></table>`);
+    } else {
+      html('fa-team', `<div class="loading">No contacts with ≥ ${threshold} cart views</div>`);
+    }
+
+  } finally { endLoad(); }
+}
+
+function exportFunnelAb() {
+  if (!_faData || !_faData.abandoned) return;
+  const headers = ['contact','name','view_cart_count','first_view','last_view'];
+  const rows = _faData.abandoned.map(c =>
+    [c.customer_contact||'', c.customer_name||'', c.view_cart_count, c.first_view||'', c.last_view||''].join(',')
+  );
+  const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+  const blob = new Blob([csv], { type:'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `abandoned_carts_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+}
+let currentPage = 'overview';
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    currentPage = tab.dataset.page;
+    el('pg-'+currentPage).classList.add('active');
+    LOADERS[currentPage]?.().catch(e => {
+      console.error(currentPage, e);
+      el('err-msg').classList.add('show');
+      el('err-text').textContent = e.message;
+      endLoad();
+    });
+  });
+});
+
+async function applyFilters() {
+  el('err-msg').classList.remove('show');
+  try {
+    await LOADERS[currentPage]?.();
+    el('last-ref').textContent = 'Updated '+new Date().toLocaleTimeString();
+  } catch(e) {
+    el('err-msg').classList.add('show');
+    el('err-text').textContent = e.message;
+    endLoad();
+  }
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+(async () => {
+  await checkHealth();
+  await initFilters();           // sets date pickers to actual DB range
+  await loadOverview();          // first page
+  el('last-ref').textContent = 'Loaded '+new Date().toLocaleTimeString();
+  // auto-refresh every 2 minutes
+  setInterval(async () => {
+    await checkHealth();
+    try { await LOADERS[currentPage]?.(); el('last-ref').textContent='Auto '+new Date().toLocaleTimeString(); } catch(e){}
+  }, 120000);
+})();
+</script>
+</body>
+</html>

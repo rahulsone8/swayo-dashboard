@@ -390,6 +390,8 @@ td.bad{color:var(--red)}
   <div class="tab" data-page="products">🍱 Products</div>
   <div class="tab" data-page="geo">🗺 Geo</div>
   <div class="tab" data-page="pnl">💰 P&amp;L</div>
+  <div class="tab" data-page="orders-tab">📋 Orders</div>
+  <div class="tab" data-page="coupons-tab">🎟 Coupons</div>
   <a href="/export.html" target="_blank" style="padding:0 13px;height:54px;display:flex;align-items:center;font-size:11px;color:var(--green);white-space:nowrap;gap:4px;border-bottom:2px solid rgba(16,185,129,.4);font-weight:700;flex-shrink:0">⬇ Export</a>
   <div class="nav-r">
     <div class="db-dot" id="db-dot"></div>
@@ -398,21 +400,29 @@ td.bad{color:var(--red)}
   </div>
 </div>
 
-<!-- ══ FILTER BAR ═══════════════════════════════════════════════ -->
+<!-- ══ FILTER BAR — multi-select ════════════════════════════════ -->
 <div class="fbar">
   <label>From</label>
   <input type="date" id="f-from" class="fsel finp"/>
   <label>To</label>
   <input type="date" id="f-to" class="fsel finp"/>
   <label>Platform</label>
-  <select id="f-plat" class="fsel">
-    <option value="">All Platforms</option>
+  <!-- Multi-select: hold Ctrl/Cmd to select multiple -->
+  <select id="f-plat" class="fsel" multiple size="1" style="min-width:130px;height:30px"
+          title="Hold Ctrl/Cmd to select multiple">
     <option value="gf_whatsapp">GrabFood WhatsApp</option>
     <option value="swayo_whatsapp">Swayo WhatsApp</option>
     <option value="swayo_app">Swayo App</option>
   </select>
   <label>Restaurant</label>
-  <select id="f-rest" class="fsel" style="max-width:200px"><option value="">All Restaurants</option></select>
+  <select id="f-rest" class="fsel" multiple size="1" style="max-width:180px;height:30px"
+          title="Hold Ctrl/Cmd to select multiple">
+    <option value="">All Restaurants</option>
+  </select>
+  <label>Delivery</label>
+  <select id="f-dtype" class="fsel" style="min-width:90px">
+    <option value="">All Types</option>
+  </select>
   <button class="fbtn" onclick="applyFilters()">▶ Apply</button>
   <button class="fbtn sec" onclick="resetFilters()">↺ Reset</button>
   <span id="loading-ind" style="display:none;align-items:center;gap:6px;font-size:11px;color:var(--t3)">
@@ -420,6 +430,7 @@ td.bad{color:var(--red)}
   </span>
 </div>
 <div id="err-banner" class="err-banner">⚠ <span id="err-text"></span></div>
+
 
 <!-- ══════════════════════════════════════════════════════════════
      PAGE 1 — OVERVIEW
@@ -835,6 +846,63 @@ td.bad{color:var(--red)}
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════
+     PAGE 12 — ORDERS (Excel-like view)
+══════════════════════════════════════════════════════════════ -->
+<div id="pg-orders-tab" class="page">
+  <div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:10px;padding:12px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+    <div><div style="font-size:10px;color:var(--t3);margin-bottom:4px;text-transform:uppercase">Status</div>
+      <select id="ord-status" class="fsel"><option value="">All</option><option>Completed</option><option>Cancelled</option><option>Accepted</option></select></div>
+    <div><div style="font-size:10px;color:var(--t3);margin-bottom:4px;text-transform:uppercase">Delivery Type</div>
+      <select id="ord-dtype" class="fsel"><option value="">All</option></select></div>
+    <div><div style="font-size:10px;color:var(--t3);margin-bottom:4px;text-transform:uppercase">Has Coupon</div>
+      <select id="ord-coupon" class="fsel"><option value="">All</option><option value="1">Yes</option><option value="0">No</option></select></div>
+    <button class="fbtn" onclick="loadOrdersTab()">▶ Load</button>
+    <button class="fbtn sec" onclick="exportOrders('csv')">⬇ CSV</button>
+    <button class="fbtn sec" onclick="exportOrders('excel')">⬇ Excel</button>
+  </div>
+  <div class="kpi-grid k3" id="ordtab-kpis"></div>
+  <!-- Continuous order trend graph -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title">📈 Order Trend</div>
+    <svg id="ordtab-trend-svg" width="100%" height="80" viewBox="0 0 800 80"></svg>
+  </div>
+  <div class="card">
+    <div class="card-title">📋 All Orders <span id="ordtab-count" style="font-size:10px;color:var(--t3);font-weight:400"></span></div>
+    <div class="tbl-wrap" id="ordtab-table"><div class="loading">Click Load to view orders</div></div>
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+      <button class="fbtn sec" id="ordtab-prev" onclick="ordPage(-1)" disabled>← Prev</button>
+      <span id="ordtab-page-info" style="font-size:11px;color:var(--t3)">Page 1</span>
+      <button class="fbtn sec" id="ordtab-next" onclick="ordPage(1)">Next →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     PAGE 13 — COUPONS
+══════════════════════════════════════════════════════════════ -->
+<div id="pg-coupons-tab" class="page">
+  <div class="kpi-grid k3" id="cpn-kpis"></div>
+  <div class="row">
+    <div class="card c2">
+      <div class="card-title">🎟 Coupon Usage by Value / Restaurant</div>
+      <div class="tbl-wrap" id="cpn-summary"></div>
+    </div>
+    <div class="card c1">
+      <div class="card-title">📊 Coupon vs No-Coupon AOV</div>
+      <div id="cpn-aov-compare"></div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="card c3">
+      <div class="card-title">👥 Individual Coupon Orders — with Customer Details
+        <button class="fbtn sec" style="margin-left:auto;font-size:10px" onclick="exportCoupons()">⬇ Export</button>
+      </div>
+      <div class="tbl-wrap" id="cpn-detail"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
      JAVASCRIPT
 ══════════════════════════════════════════════════════════════ -->
 <script>
@@ -842,7 +910,6 @@ td.bad{color:var(--red)}
 const API = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
 
 // ── PLATFORM VALUES (exact from pipeline v5.1) ────────────────────────────
-// IMPORTANT: v5.1 uses "gf_whatsapp" not "grabfood_whatsapp"
 const PLAT = {
   gf_whatsapp:    'GrabFood WhatsApp',
   swayo_whatsapp: 'Swayo WhatsApp',
@@ -853,22 +920,13 @@ const PCOL = {
   swayo_whatsapp: '#f59e0b',
   swayo_app:      '#3b82f6',
 };
-
-// Customer segments from agg_customer_behavior
 const SCOL = { VIP:'#ef4444', Loyal:'#f59e0b', Repeat:'#3b82f6', 'One-time':'#8b5cf6' };
-const SBGC = {
-  VIP: 'rgba(239,68,68,.09)', Loyal:'rgba(245,158,11,.09)',
-  Repeat:'rgba(59,130,246,.09)', 'One-time':'rgba(139,92,246,.09)'
-};
-
+const SBGC = { VIP:'rgba(239,68,68,.09)', Loyal:'rgba(245,158,11,.09)', Repeat:'rgba(59,130,246,.09)', 'One-time':'rgba(139,92,246,.09)' };
 const COLORS = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec4899'];
 const GR = [
-  'linear-gradient(90deg,#3b82f6,#60a5fa)',
-  'linear-gradient(90deg,#10b981,#34d399)',
-  'linear-gradient(90deg,#8b5cf6,#a78bfa)',
-  'linear-gradient(90deg,#f59e0b,#fbbf24)',
-  'linear-gradient(90deg,#ef4444,#f87171)',
-  'linear-gradient(90deg,#06b6d4,#38bdf8)',
+  'linear-gradient(90deg,#3b82f6,#60a5fa)','linear-gradient(90deg,#10b981,#34d399)',
+  'linear-gradient(90deg,#8b5cf6,#a78bfa)','linear-gradient(90deg,#f59e0b,#fbbf24)',
+  'linear-gradient(90deg,#ef4444,#f87171)','linear-gradient(90deg,#06b6d4,#38bdf8)',
   'linear-gradient(90deg,#ec4899,#f472b6)',
 ];
 
@@ -896,13 +954,31 @@ async function api(path) {
   return j;
 }
 
-// ── FILTER PARAMS ──────────────────────────────────────────────────────────
+// ── FILTER PARAMS — multi-select support ──────────────────────────────────
 function fp() {
   const p = new URLSearchParams();
   const from=el('f-from')?.value, to=el('f-to')?.value;
-  const plat=el('f-plat')?.value, rest=el('f-rest')?.value;
-  if(from) p.set('from',from); if(to) p.set('to',to);
-  if(plat) p.set('platform',plat); if(rest) p.set('shop_id',rest);
+  if(from) p.set('from',from);
+  if(to)   p.set('to',to);
+
+  // Multi-select platform — join selected options with comma
+  const platSel = el('f-plat');
+  if(platSel) {
+    const selected = Array.from(platSel.selectedOptions).map(o=>o.value).filter(Boolean);
+    if(selected.length) p.set('platform', selected.join(','));
+  }
+
+  // Multi-select restaurant
+  const restSel = el('f-rest');
+  if(restSel) {
+    const selected = Array.from(restSel.selectedOptions).map(o=>o.value).filter(Boolean);
+    if(selected.length) p.set('shop_id', selected.join(','));
+  }
+
+  // Delivery type single select
+  const dtype = el('f-dtype')?.value;
+  if(dtype) p.set('delivery_type', dtype);
+
   return p.toString();
 }
 
@@ -1001,32 +1077,51 @@ async function initFilters() {
     if(d.min_date) el('f-from').value = d.min_date;
     if(d.max_date) el('f-to').value   = d.max_date;
 
+    // Populate restaurant multi-select (clear first)
     const rs = el('f-rest');
+    while(rs.options.length) rs.remove(0);
     (d.restaurants||[]).forEach(r=>{
       const o=document.createElement('option');
       o.value=r.shop_id; o.textContent=r.restaurant_name||r.shop_id;
       rs.appendChild(o);
     });
 
-    // Populate campaign selector
-    const cs = el('camp-sel');
-    (d.campaigns||[]).forEach(c=>{
-      const o=document.createElement('option');
-      o.value=c.campaign_name;
-      o.textContent=`${c.campaign_name} (${c.scheduled_date||'—'})`;
-      cs.appendChild(o);
-    });
+    // Delivery type filter
+    const dt = el('f-dtype');
+    if(dt){
+      while(dt.options.length>1) dt.remove(1);
+      (d.deliveryTypes||[]).forEach(t=>{
+        const o=document.createElement('option');
+        o.value=t; o.textContent=t; dt.appendChild(o);
+      });
+      // Also populate ord-dtype on Orders tab
+      const odt=el('ord-dtype');
+      if(odt){ while(odt.options.length>1) odt.remove(1); (d.deliveryTypes||[]).forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; odt.appendChild(o); }); }
+    }
 
-    // Set campaign date pickers to DB range
-    if(el('camp-from')&&d.min_date) el('camp-from').value=d.min_date;
-    if(el('camp-to')&&d.max_date)   el('camp-to').value=d.max_date;
-    if(el('geo-from')&&d.min_date)  el('geo-from').value=d.min_date;
-    if(el('geo-to')&&d.max_date)    el('geo-to').value=d.max_date;
+    // Populate campaign selector (grouped by campaign_name)
+    const cs = el('camp-sel');
+    if(cs){
+      while(cs.options.length>1) cs.remove(1);
+      (d.campaigns||[]).forEach(c=>{
+        const o=document.createElement('option');
+        o.value=c.campaign_name;
+        o.textContent=`${c.campaign_name} — ${c.scheduled_date||'?'} (${fmt(c.recipient_count)} recipients)`;
+        cs.appendChild(o);
+      });
+    }
+
+    // Set date pickers on other tabs
+    ['camp-from','geo-from'].forEach(id=>{ if(el(id)&&d.min_date) el(id).value=d.min_date; });
+    ['camp-to','geo-to'].forEach(id=>{   if(el(id)&&d.max_date)   el(id).value=d.max_date; });
   } catch(e) { console.warn('Filter init failed',e); }
 }
 
 function resetFilters() {
-  el('f-plat').value=''; el('f-rest').value='';
+  // Deselect all options in multi-selects
+  const ps=el('f-plat'); if(ps) Array.from(ps.options).forEach(o=>o.selected=false);
+  const rs=el('f-rest'); if(rs) Array.from(rs.options).forEach(o=>o.selected=false);
+  const dt=el('f-dtype'); if(dt) dt.value='';
   initFilters().then(()=>applyFilters());
 }
 
@@ -1367,10 +1462,11 @@ function renderTrendsPage(ov) {
   const trows=mon.map((m,i)=>{
     const prev=mon[i-1];
     const chg=prev&&prev.orders>0?((m.orders-prev.orders)/prev.orders*100).toFixed(1):null;
-    return `<tr><td>${m.month_key}</td><td class="num">${fmt(m.orders)}</td>
-      <td>${chg!=null?`<span style="color:${chg>=0?'var(--green)':'var(--red)'}">${chg>=0?'▲':'▼'}${Math.abs(chg)}%</span>`:'—'}</td>
-      <td class="num">${fmtK(m.gmv)}</td><td class="num">${fmtR(m.aov)}</td>
-      <td class="num">${fmt(m.unique_customers)}</td></tr>`;
+    const chgCell=chg!=null?'<span style="color:'+(chg>=0?'var(--green)':'var(--red)')+';">'+(chg>=0?'▲':'▼')+Math.abs(chg)+'%</span>':'—';
+    return '<tr><td>'+m.month_key+'</td><td class="num">'+fmt(m.orders)+'</td>'
+      +'<td>'+chgCell+'</td>'
+      +'<td class="num">'+fmtK(m.gmv)+'</td><td class="num">'+fmtR(m.aov)+'</td>'
+      +'<td class="num">'+fmt(m.unique_customers)+'</td></tr>';
   }).join('');
   html('mom-table',`<table><thead><tr><th>Month</th><th>Orders</th><th>MoM Δ</th><th>GMV</th><th>AOV</th><th>Uniq Users</th></tr></thead><tbody>${trows}</tbody></table>`);
 
@@ -1487,11 +1583,12 @@ async function loadFunnel() {
       const w=top>0?(s.total/top*100).toFixed(0):0;
       const prev=i>0?stages[i-1].total:s.total;
       const drop=i>0?((1-s.total/prev)*100).toFixed(1):null;
-      return `${drop?`<div class="farrow">▼ ${drop}% drop-off</div>`:''}
-        <div class="fstage"><div class="flbl">${s.stage_name}</div>
-        <div class="fouter"><div class="finner" style="width:${w}%;background:${SCOLS[i]}1a;border-left:3px solid ${SCOLS[i]}">
-          <span class="fcnt">${fmt(s.total)}</span><span class="fpct">${pct(s.total,top)}</span>
-        </div></div></div>`;
+      const farrow1=(drop?'<div class="farrow">▼ '+drop+'% drop-off</div>':'');
+      return farrow1
+        +'<div class="fstage"><div class="flbl">'+s.stage_name+'</div>'
+        +'<div class="fouter"><div class="finner" style="width:'+w+'%;background:'+SCOLS[i]+'1a;border-left:3px solid '+SCOLS[i]+'">'
+        +'<span class="fcnt">'+fmt(s.total)+'</span><span class="fpct">'+pct(s.total,top)+'</span>'
+        +'</div></div></div>';
     }).join(''));
     const drops=stages.slice(1).map((s,i)=>({lbl:`${stages[i].stage_name}→${s.stage_name}`,dropped:stages[i].total-s.total,pctV:((1-s.total/stages[i].total)*100).toFixed(1)}));
     const maxD=Math.max(...drops.map(d=>d.dropped),1);
@@ -1525,11 +1622,13 @@ async function loadFunnelWA() {
       const w=top>0?(s.total/top*100).toFixed(0):0;
       const prev=i>0?stages[i-1].total:s.total;
       const drop=i>0?((1-s.total/prev)*100).toFixed(1):null;
-      return `${drop?`<div class="farrow">▼ ${drop}% drop-off</div>`:''}
-        <div class="fstage"><div class="flbl">${s.stage_name}</div>
-        <div class="fouter"><div class="finner" style="width:${Math.min(w,100)}%;background:${WA_COLS[i]||'#333'}1a;border-left:3px solid ${WA_COLS[i]||'#333'}">
-          <span class="fcnt">${fmt(s.total)}</span><span class="fpct">${pct(s.total,top)}</span>
-        </div></div></div>`;
+      const wcol2=(WA_COLS[i]||'#333');
+      const farrow2=(drop?'<div class="farrow">▼ '+drop+'% drop-off</div>':'');
+      return farrow2
+        +'<div class="fstage"><div class="flbl">'+s.stage_name+'</div>'
+        +'<div class="fouter"><div class="finner" style="width:'+Math.min(w,100)+'%;background:'+wcol2+'1a;border-left:3px solid '+wcol2+'">'
+        +'<span class="fcnt">'+fmt(s.total)+'</span><span class="fpct">'+pct(s.total,top)+'</span>'
+        +'</div></div></div>';
     }).join(''));
 
     // By restaurant table
@@ -1756,9 +1855,10 @@ function renderMonthFreq(opum, mk) {
     <div class="btrack"><div class="bfill ${['gr0','gr1','gr2','gr3'][i]}" style="width:${(dist[k]/maxV*100).toFixed(0)}%">
       <span>${fmt(dist[k])} users</span></div></div></div>`).join(''));
   const top10=rows.slice(0,10);
-  html('freq-table',`<div style="font-size:10px;color:var(--t3);margin-bottom:6px">Top users — ${mk}</div>
-    <table><thead><tr><th>Contact</th><th>Orders</th></tr></thead>
-    <tbody>${top10.map(r=>`<tr><td class="mono">${r.customer_contact||'—'}</td><td class="num">${r.order_count}</td></tr>`).join('')}</tbody></table>`);
+  const freqRows=top10.map(r=>'<tr><td class="mono">'+(r.customer_contact||'—')+'</td><td class="num">'+r.order_count+'</td></tr>').join('');
+  html('freq-table','<div style="font-size:10px;color:var(--t3);margin-bottom:6px">Top users — '+mk+'</div>'
+    +'<table><thead><tr><th>Contact</th><th>Orders</th></tr></thead>'
+    +'<tbody>'+freqRows+'</tbody></table>');
 }
 
 // ── PRODUCTS ──────────────────────────────────────────────────────────────────
@@ -1878,31 +1978,49 @@ function exportGeo() {
   const a=document.createElement('a'); a.href=`${API}/api/export/csv?${p}`; a.click();
 }
 
-// ── P&L ───────────────────────────────────────────────────────────────────────
+// ── P&L — FIX: use total_discount from server (covers all platforms) ─────────
 async function loadPnl() {
   startLoad();
   try {
     const d=await api('pnl?'+fp());
     const t=d.totals||{};
-    const totalDisc=Number(t.menu_discount||0)+Number(t.cart_discount||0)+Number(t.coupon_value||0);
-    const totalCh=Number(t.packing_charge||0)+Number(t.delivery_charge||0)+Number(t.convenience_charge||0)+Number(t.tax||0);
+    // FIX: use total_discount (= fo.discount, covers GF+SWWA+App)
+    // not menu_discount+cart_discount (only filled for swayo_app)
+    const totalDisc = Number(t.total_discount||0);
+    const totalCh   = Number(t.packing_charge||0)+Number(t.delivery_charge||0)+Number(t.convenience_charge||0)+Number(t.tax||0);
     html('pnl-kpis',`
-      <div class="kpi green"><div class="kl">Gross GMV</div><div class="kv">${fmtK(t.gmv)}</div></div>
-      <div class="kpi blue"><div class="kl">Net Revenue</div><div class="kv">${fmtK(t.net_revenue)}</div></div>
-      <div class="kpi red"><div class="kl">Total Discounts</div><div class="kv">${fmtK(totalDisc)}</div></div>
-      <div class="kpi orange"><div class="kl">Add-on Charges</div><div class="kv">${fmtK(totalCh)}</div></div>`);
+      <div class="kpi green"><div class="kl">Gross GMV</div><div class="kv">${fmtK(t.gmv)}</div><div class="ks">Total order_value paid</div></div>
+      <div class="kpi blue"><div class="kl">Net Revenue</div><div class="kv">${fmtK(t.net_revenue)}</div><div class="ks">GMV − discount</div></div>
+      <div class="kpi red"><div class="kl">Total Discounts</div><div class="kv">${fmtK(totalDisc)}</div><div class="ks">fo.discount (all platforms)</div></div>
+      <div class="kpi orange"><div class="kl">Add-on Charges</div><div class="kv">${fmtK(totalCh)}</div><div class="ks">Packing + Delivery + Tax</div></div>`);
+
     const rows=(d.monthly||[]).map(m=>`
       <tr><td>${m.month_key}</td>
           <td class="num hi">${fmtK(m.gmv)}</td>
-          <td class="num bad">-${fmtK(Number(m.menu_discount||0)+Number(m.cart_discount||0)+Number(m.coupon_value||0))}</td>
+          <td class="num bad">-${fmtK(m.total_discount||0)}</td>
           <td class="num" style="color:var(--blue)">+${fmtK(m.packing_charge)}</td>
           <td class="num" style="color:var(--blue)">+${fmtK(m.delivery_charge)}</td>
           <td class="num" style="color:var(--purple)">+${fmtK(m.tax)}</td>
           <td class="num" style="color:var(--t1);font-weight:700">${fmtK(m.net_revenue)}</td>
           <td class="num">${fmt(m.orders)}</td></tr>`).join('');
-    html('pnl-table',`<table><thead><tr><th>Month</th><th>GMV</th><th>Discounts</th><th>Packing</th><th>Delivery</th><th>Tax</th><th>Net Revenue</th><th>Orders</th></tr></thead>
+    html('pnl-table',`<table><thead><tr><th>Month</th><th>GMV</th><th>Discount</th><th>Packing</th><th>Delivery</th><th>Tax</th><th>Net Revenue</th><th>Orders</th></tr></thead>
       <tbody>${rows||'<tr><td colspan="8" class="loading">No data</td></tr>'}</tbody></table>`);
-    // Waterfall
+
+    // Platform breakdown for drill-down
+    if((d.byPlatform||[]).length){
+      const pbRows=(d.byPlatform||[]).map(p=>`
+        <tr><td><span class="plat-tag" style="color:${PCOL[p.platform]||'#fff'};background:${PCOL[p.platform]||'#333'}22">${PLAT[p.platform]||p.platform}</span></td>
+            <td class="num">${fmtK(p.gmv)}</td>
+            <td class="num bad">-${fmtK(p.total_discount)}</td>
+            <td class="num">${fmtK(p.packing_charge)}</td>
+            <td class="num">${fmtK(p.tax)}</td>
+            <td class="num hi">${fmtK(p.net_revenue)}</td></tr>`).join('');
+      const pTable=`<div style="margin-top:12px"><div class="card-title">📡 By Platform</div>
+        <table><thead><tr><th>Platform</th><th>GMV</th><th>Discount</th><th>Packing</th><th>Tax</th><th>Net Rev</th></tr></thead>
+        <tbody>${pbRows}</tbody></table></div>`;
+      const pnlTable=el('pnl-table'); if(pnlTable) pnlTable.insertAdjacentHTML('afterend',pTable);
+    }
+
     const items=[
       {l:'GMV',v:Number(t.gmv||0),c:'var(--green)'},
       {l:'Disc',v:-totalDisc,c:'var(--red)'},
@@ -1924,20 +2042,162 @@ async function loadPnl() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+//  ORDERS TAB — Excel-like view with pagination
+// ════════════════════════════════════════════════════════════════════════════
+let _ordPage=0, _ordTotal=0;
+const ORD_LIMIT=100;
+
+async function loadOrdersTab(page=0) {
+  _ordPage=page;
+  startLoad();
+  try {
+    const p=new URLSearchParams(fp());
+    const st=el('ord-status')?.value, dt=el('ord-dtype')?.value, cp=el('ord-coupon')?.value;
+    if(st) p.set('order_status',st);
+    if(dt) p.set('delivery_type',dt);
+    if(cp!==undefined&&cp!=='') p.set('has_coupon',cp);
+    p.set('limit',String(ORD_LIMIT));
+    p.set('offset',String(page*ORD_LIMIT));
+
+    const d=await api('orders_list?'+p);
+    _ordTotal=d.total||0;
+    html('ordtab-count',`(${fmt(_ordTotal)} total, showing ${fmt(d.rows?.length||0)})`);
+    html('ordtab-kpis',`
+      <div class="kpi blue"><div class="kl">Total Orders</div><div class="kv">${fmt(_ordTotal)}</div></div>
+      <div class="kpi green"><div class="kl">Page</div><div class="kv">${page+1}</div><div class="ks">of ${Math.ceil(_ordTotal/ORD_LIMIT)}</div></div>
+      <div class="kpi orange"><div class="kl">Records shown</div><div class="kv">${fmt(d.rows?.length||0)}</div></div>`);
+
+    // Trend SVG using daily from overview cache
+    const daily=_modalData.daily||[];
+    if(daily.length) renderDoDChart(daily,'ordtab-trend-svg',800,75);
+
+    const cols=['order_id','order_date','order_dow','platform','restaurant_name','customer_name','customer_contact','customer_segment','order_value','discount','delivery_type','order_status','has_coupon','lifetime_orders'];
+    const rows=(d.rows||[]).map(r=>`<tr onclick="drillRow(${JSON.stringify(r).replace(/"/g,'&quot;')})" style="cursor:pointer" title="Click for details">`+
+      cols.map(c=>{
+        const v=r[c];
+        if(c==='platform') return `<td><span class="plat-tag" style="color:${PCOL[v]||'#fff'};font-size:10px">${PLAT[v]||v||'—'}</span></td>`;
+        if(c==='order_status') return `<td><span class="pill ${v==='Completed'?'pg':v==='Cancelled'?'pr':'po'}">${v||'—'}</span></td>`;
+        if(c==='has_coupon') return `<td>${Number(v)?'<span class="pill pg">Yes</span>':'—'}</td>`;
+        if(c==='customer_segment') return `<td><span class="pill ${SCOL[v]?'pp':'pb'}">${v||'—'}</span></td>`;
+        if(['order_value','discount'].includes(c)) return `<td class="num hi">${fmtR(v)}</td>`;
+        if(c==='customer_contact') return `<td class="mono">${v||'—'}</td>`;
+        return `<td>${v??'—'}</td>`;
+      }).join('')+'</tr>').join('');
+
+    const ordHeaders=cols.map(c=>'<th>'+c.replace(/_/g,' ')+'</th>').join('');
+    const ordEmpty='<tr><td colspan="'+cols.length+'" class="loading">No data</td></tr>';
+    html('ordtab-table','<table><thead><tr>'+ordHeaders+'</tr></thead>'
+      +'<tbody>'+(rows||ordEmpty)+'</tbody></table>');
+
+    el('ordtab-prev').disabled=(page===0);
+    el('ordtab-next').disabled=(page+1)*ORD_LIMIT>=_ordTotal;
+    html('ordtab-page-info',`Page ${page+1} of ${Math.ceil(_ordTotal/ORD_LIMIT)} · ${fmt(_ordTotal)} total`);
+  } catch(e){ console.error(e); } finally { endLoad(); }
+}
+
+function ordPage(dir) { loadOrdersTab(_ordPage+dir); }
+
+function drillRow(r) {
+  // Show details in modal
+  el('modal-title').textContent=`Order ${r.order_id} — ${r.order_date}`;
+  el('modal-overlay').classList.add('open');
+  document.body.style.overflow='hidden';
+  const fields=Object.entries(r).map(([k,v])=>`
+    <div class="metric-row"><div class="metric-label">${k.replace(/_/g,' ')}</div>
+    <div class="metric-value">${v??'—'}</div></div>`).join('');
+  el('modal-body').innerHTML=`<div style="max-width:500px">${fields}</div>`;
+}
+
+function exportOrders(format) {
+  const p=new URLSearchParams(fp());
+  p.set('export_type','orders');
+  const st=el('ord-status')?.value, dt=el('ord-dtype')?.value, cp=el('ord-coupon')?.value;
+  if(st) p.set('order_status',st);
+  if(dt) p.set('delivery_type',dt);
+  if(cp!==undefined&&cp!=='') p.set('has_coupon',cp);
+  p.set('limit','10000');
+  const a=document.createElement('a'); a.href=`${API}/api/export/${format}?${p}`; a.click();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  COUPONS TAB
+// ════════════════════════════════════════════════════════════════════════════
+async function loadCouponsTab() {
+  startLoad();
+  try {
+    const d=await api('coupons?'+fp());
+    const s=d.summary||{};
+    html('cpn-kpis',`
+      <div class="kpi orange"><div class="kl">Coupon Orders</div><div class="kv">${fmt(s.coupon_orders)}</div></div>
+      <div class="kpi blue"><div class="kl">Unique Customers</div><div class="kv">${fmt(s.unique_customers)}</div></div>
+      <div class="kpi red"><div class="kl">Total Discount Given</div><div class="kv">${fmtK(s.total_discount_given)}</div></div>`);
+
+    const sumRows=(d.byCoupon||[]).map(r=>`
+      <tr><td class="num hi">${fmtR(r.coupon_value)}</td>
+          <td>${PLAT[r.platform]||r.platform||'—'}</td>
+          <td>${r.restaurant_name||'—'}</td>
+          <td>${r.delivery_type||'—'}</td>
+          <td class="num">${fmt(r.times_used)}</td>
+          <td class="num">${fmt(r.unique_customers)}</td>
+          <td class="num">${fmtK(r.total_gmv)}</td>
+          <td class="num">${fmtR(r.avg_order_value)}</td></tr>`).join('');
+    html('cpn-summary',`<table><thead><tr><th>Coupon Value</th><th>Platform</th><th>Restaurant</th><th>Delivery Type</th><th>Times Used</th><th>Unique Cust</th><th>GMV</th><th>Avg AOV</th></tr></thead>
+      <tbody>${sumRows||'<tr><td colspan="8" class="loading">No coupon data</td></tr>'}</tbody></table>`);
+
+    // AOV compare
+    html('cpn-aov-compare',`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
+        <div style="background:var(--bg1);border-radius:8px;padding:13px;text-align:center">
+          <div style="font-size:10px;color:var(--t3);margin-bottom:5px;text-transform:uppercase">With Coupon</div>
+          <div style="font-size:22px;font-weight:800;color:var(--orange)">${fmtR(s.avg_aov_with_coupon)}</div>
+        </div>
+        <div style="background:var(--bg1);border-radius:8px;padding:13px;text-align:center">
+          <div style="font-size:10px;color:var(--t3);margin-bottom:5px;text-transform:uppercase">Without Coupon</div>
+          <div style="font-size:22px;font-weight:800;color:var(--green)">${fmtR(s.avg_aov_without_coupon)}</div>
+          <div style="font-size:10px;color:var(--green);margin-top:3px">+${fmtR(Math.max(0,s.avg_aov_without_coupon-s.avg_aov_with_coupon))} higher</div>
+        </div>
+      </div>`);
+
+    const detRows=(d.detail||[]).map(r=>`
+      <tr><td class="mono">${r.order_id||'—'}</td>
+          <td>${r.order_date||'—'}</td>
+          <td>${PLAT[r.platform]||r.platform||'—'}</td>
+          <td>${r.restaurant_name||'—'}</td>
+          <td class="mono">${r.customer_contact||'—'}</td>
+          <td>${r.customer_name||'—'}</td>
+          <td><span class="pill ${SCOL[r.segment]?'pp':'pb'}">${r.segment||'—'}</span></td>
+          <td class="num hi">${fmtR(r.coupon_value||r.discount)}</td>
+          <td class="num">${fmtR(r.order_value)}</td>
+          <td>${r.delivery_type||'—'}</td>
+          <td>${r.order_status||'—'}</td></tr>`).join('');
+    html('cpn-detail',`<table><thead><tr><th>Order ID</th><th>Date</th><th>Platform</th><th>Restaurant</th><th>Contact</th><th>Name</th><th>Segment</th><th>Coupon</th><th>Order Value</th><th>Delivery</th><th>Status</th></tr></thead>
+      <tbody>${detRows||'<tr><td colspan="11" class="loading">No coupon orders found</td></tr>'}</tbody></table>`);
+  } catch(e){ console.error(e); } finally { endLoad(); }
+}
+
+function exportCoupons() {
+  const p=new URLSearchParams(fp());
+  p.set('export_type','coupons'); p.set('limit','10000');
+  const a=document.createElement('a'); a.href=`${API}/api/export/csv?${p}`; a.click();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 //  ROUTER
 // ════════════════════════════════════════════════════════════════════════════
 const LOADERS = {
-  overview:    loadOverview,
-  trends:      loadTrends,
-  platform:    loadPlatform,
-  restaurants: loadRestaurants,
-  funnel:      loadFunnel,
-  'funnel-wa': loadFunnelWA,
-  campaigns:   loadCampaigns,
-  customers:   loadCustomers,
-  products:    loadProducts,
-  geo:         loadGeo,
-  pnl:         loadPnl,
+  overview:      loadOverview,
+  trends:        loadTrends,
+  platform:      loadPlatform,
+  restaurants:   loadRestaurants,
+  funnel:        loadFunnel,
+  'funnel-wa':   loadFunnelWA,
+  campaigns:     loadCampaigns,
+  customers:     loadCustomers,
+  products:      loadProducts,
+  geo:           loadGeo,
+  pnl:           loadPnl,
+  'orders-tab':  loadOrdersTab,
+  'coupons-tab': loadCouponsTab,
 };
 
 let currentPage='overview';

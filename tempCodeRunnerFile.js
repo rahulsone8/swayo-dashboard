@@ -626,215 +626,133 @@ app.get("/api/campaigns", async (req, res) => {
   try {
     const campDateExpr = "DATE(DATE_ADD(fc.scheduled_date, INTERVAL 330 MINUTE))";
     const campRunExpr = "COALESCE(fc.scheduled_at, fc.delivered_at, fc.read_at, fc.sent_at, DATE_ADD(fc.scheduled_date, INTERVAL 330 MINUTE))";
-    const orderTsExpr = "COALESCE(fo.created_at, CAST(CONCAT(fo.order_date, ' 00:00:00') AS DATETIME))";
-    const campPlatExpr = canonicalPlatformExpr("fo");
     // FIX: filter by campaign_name, not campaign_id
     const cc = ["1=1"], cv = [];
     if (req.query.campaign_name) { cc.push("fc.campaign_name = ?"); cv.push(req.query.campaign_name); }
     if (req.query.from) { cc.push(`${campDateExpr} >= ?`); cv.push(req.query.from); }
     if (req.query.to)   { cc.push(`${campDateExpr} <= ?`); cv.push(req.query.to); }
     const cWhere = cc.join(" AND ");
-    const recipientBase = `
-      SELECT
-        fc.campaign_name,
-        fc.mobile_number,
-        MIN(${campDateExpr}) AS scheduled_date,
-        MIN(${campRunExpr}) AS campaign_run_at,
-        MAX(fc.is_sent) AS is_sent,
-        MAX(fc.is_delivered) AS is_delivered,
-        MAX(fc.is_read) AS is_read,
-        MAX(fc.sent_at) AS sent_at,
-        MAX(fc.delivered_at) AS delivered_at,
-        MAX(fc.read_at) AS read_at,
-        MAX(fc.pitch_response) AS pitch_response,
-        CASE
-          WHEN MAX(fc.is_read) = 1 THEN 'Read'
-          WHEN MAX(fc.is_delivered) = 1 THEN 'Delivered'
-          WHEN MAX(fc.is_sent) = 1 THEN 'Sent'
-          ELSE COALESCE(MAX(fc.delivery_status), 'Pending')
-        END AS delivery_status
-      FROM fact_campaigns fc
-      WHERE ${cWhere}
-      GROUP BY fc.campaign_name, fc.mobile_number
-    `;
+    const cWhereBare = cWhere.replace(/fc\./g, "");
 
     // Performance — grouped by campaign_name
     const perf = await q(`
-      SELECT rb.campaign_name,
-             COUNT(DISTINCT rb.mobile_number) AS total_recipients,
-             SUM(rb.is_sent) AS sent_count,
-             SUM(rb.is_delivered) AS delivered_count,
-             SUM(rb.is_read) AS read_count,
-             ROUND(SUM(rb.is_sent)*100.0/NULLIF(COUNT(DISTINCT rb.mobile_number),0),1) AS sent_rate_pct,
-             ROUND(SUM(rb.is_delivered)*100.0/NULLIF(COUNT(DISTINCT rb.mobile_number),0),1) AS delivered_rate_pct,
-             ROUND(SUM(rb.is_read)*100.0/NULLIF(COUNT(DISTINCT rb.mobile_number),0),1) AS read_rate_pct,
-             MIN(rb.scheduled_date) AS scheduled_date
-      FROM (${recipientBase}) rb
-      GROUP BY rb.campaign_name
+      SELECT fc.campaign_name,
+             COUNT(DISTINCT fc.mobile_number) AS total_recipients,
+             SUM(fc.is_sent) AS sent_count, SUM(fc.is_delivered) AS delivered_count,
+             SUM(fc.is_read) AS read_count,
+             ROUND(SUM(fc.is_sent)*100.0/NULLIF(COUNT(DISTINCT fc.mobile_number),0),1) AS sent_rate_pct,
+             ROUND(SUM(fc.is_delivered)*100.0/NULLIF(COUNT(DISTINCT fc.mobile_number),0),1) AS delivered_rate_pct,
+             ROUND(SUM(fc.is_read)*100.0/NULLIF(COUNT(DISTINCT fc.mobile_number),0),1) AS read_rate_pct,
+             MIN(${campDateExpr}) AS scheduled_date
+      FROM fact_campaigns fc WHERE ${cWhere}
+      GROUP BY fc.campaign_name
       ORDER BY scheduled_date DESC`, cv).catch(() => []);
-
-    const conv24 = await q(`
-      SELECT rb.campaign_name,
-             COUNT(DISTINCT rb.mobile_number) AS recipient_count,
-             COUNT(DISTINCT CASE
-               WHEN ${orderTsExpr} >= rb.campaign_run_at
-                AND ${orderTsExpr} < DATE_ADD(rb.campaign_run_at, INTERVAL 24 HOUR)
-               THEN fo.order_id END) AS orders_after_24h,
-             COUNT(DISTINCT CASE
-               WHEN ${orderTsExpr} >= rb.campaign_run_at
-                AND ${orderTsExpr} < DATE_ADD(rb.campaign_run_at, INTERVAL 24 HOUR)
-               THEN rb.mobile_number END) AS converters_24h
-      FROM (${recipientBase}) rb
-      LEFT JOIN fact_orders fo ON fo.customer_contact = rb.mobile_number
-        AND ${campPlatExpr} IN ('gf_whatsapp','swayo_whatsapp','swayo_app')
-      GROUP BY rb.campaign_name`, cv).catch(() => []);
-    const convMap = new Map(conv24.map(r => [r.campaign_name, r]));
-    perf.forEach((p) => {
-      const c = convMap.get(p.campaign_name) || {};
-      p.orders_after_24h = Number(c.orders_after_24h || 0);
-      p.conversion_rate_pct = Number(c.recipient_count || 0)
-        ? ((Number(c.converters_24h || 0) * 100) / Number(c.recipient_count)).toFixed(1)
-        : "0.0";
-    });
 
     // Individual recipients with customer behavior
     const recipients = await q(`
-      SELECT rb.campaign_name, rb.mobile_number, rb.scheduled_date, rb.campaign_run_at,
-             rb.delivery_status, rb.is_sent, rb.is_delivered, rb.is_read,
-             rb.sent_at, rb.delivered_at, rb.read_at, rb.pitch_response,
-             COALESCE(cs.total_orders, 0) AS lifetime_orders,
+      SELECT fc.campaign_name, fc.mobile_number,
+             ${campDateExpr} AS scheduled_date,
+             ${campRunExpr} AS campaign_run_at,
+             fc.delivery_status, fc.is_sent, fc.is_delivered, fc.is_read,
+             fc.sent_at, fc.delivered_at, fc.read_at, fc.pitch_response,
+             COALESCE(cb.total_orders, 0) AS lifetime_orders,
              COALESCE(cb.customer_segment,'Unknown') AS segment,
-             cs.last_order_date, COALESCE(cs.total_gmv, 0) AS lifetime_gmv
-      FROM (${recipientBase}) rb
-      LEFT JOIN agg_customer_behavior cb ON cb.customer_contact = rb.mobile_number
-      LEFT JOIN (
-        SELECT customer_contact,
-               COUNT(DISTINCT order_id) AS total_orders,
-               MAX(order_date) AS last_order_date,
-               SUM(order_value) AS total_gmv
-        FROM fact_orders
-        GROUP BY customer_contact
-      ) cs ON cs.customer_contact = rb.mobile_number
-      ORDER BY rb.delivery_status DESC, rb.is_read DESC, rb.is_delivered DESC`, cv);
+             cb.last_order_date, COALESCE(cb.total_gmv, 0) AS lifetime_gmv
+      FROM fact_campaigns fc
+      LEFT JOIN agg_customer_behavior cb ON cb.customer_contact = fc.mobile_number
+      WHERE ${cWhere}
+      ORDER BY fc.delivery_status DESC, fc.is_read DESC, fc.is_delivered DESC`, cv);
 
     // Summary
     const [summary] = await q(`
-      SELECT COUNT(DISTINCT rb.mobile_number) AS total_recipients,
-             SUM(rb.is_sent) AS sent, SUM(rb.is_delivered) AS delivered,
-             SUM(rb.is_read) AS read_count,
-             ROUND(SUM(rb.is_sent)*100.0/NULLIF(COUNT(DISTINCT rb.mobile_number),0),1) AS sent_rate,
-             ROUND(SUM(rb.is_delivered)*100.0/NULLIF(COUNT(DISTINCT rb.mobile_number),0),1) AS delivered_rate,
-             ROUND(SUM(rb.is_read)*100.0/NULLIF(COUNT(DISTINCT rb.mobile_number),0),1) AS read_rate
-      FROM (${recipientBase}) rb`, cv);
+      SELECT COUNT(DISTINCT mobile_number) AS total_recipients,
+             SUM(is_sent) AS sent, SUM(is_delivered) AS delivered,
+             SUM(is_read) AS read_count,
+             ROUND(SUM(is_sent)*100.0/NULLIF(COUNT(DISTINCT mobile_number),0),1) AS sent_rate,
+             ROUND(SUM(is_delivered)*100.0/NULLIF(COUNT(DISTINCT mobile_number),0),1) AS delivered_rate,
+             ROUND(SUM(is_read)*100.0/NULLIF(COUNT(DISTINCT mobile_number),0),1) AS read_rate
+      FROM fact_campaigns WHERE ${cWhereBare}`, cv);
 
-    // Post-campaign orders — ALL orders by recipients (no platform filter for "before", with filter for "after")
-    // This shows full order history for all recipients (not just delivered)
+    // Post-campaign orders — ALL orders by this contact (before and after), includes order_id
     const postOrders = await q(`
-      SELECT DISTINCT rb.campaign_name, rb.mobile_number,
+      SELECT fc.campaign_name, fc.mobile_number,
              fo.order_id, fo.order_date,
-             ${orderTsExpr} AS order_ts,
-             rb.scheduled_date AS campaign_date,
-             rb.campaign_run_at,
-             CASE WHEN ${orderTsExpr} >= rb.campaign_run_at THEN 'After Campaign'
+             fo.created_at AS order_ts,
+             ${campDateExpr} AS campaign_date,
+             ${campRunExpr} AS campaign_run_at,
+             CASE WHEN fo.created_at >= ${campRunExpr} THEN 'After Campaign'
                   ELSE 'Before Campaign' END AS order_timing,
              fo.order_value, fo.platform, fo.delivery_type,
              COALESCE(r.restaurant_name, fo.restaurant_name, fo.shop_id) AS restaurant_name,
-             fo.order_status, fo.customer_name
-      FROM (${recipientBase}) rb
-      JOIN fact_orders fo ON fo.customer_contact = rb.mobile_number
+             fo.order_status
+      FROM fact_campaigns fc
+      JOIN fact_orders fo ON fo.customer_contact = fc.mobile_number
       LEFT JOIN dim_restaurants r ON r.shop_id = fo.shop_id
-      ORDER BY rb.mobile_number, ${orderTsExpr} DESC`, cv);
+      WHERE ${cWhere} AND fc.is_delivered = 1
+       ORDER BY fc.mobile_number, fo.created_at DESC`, cv);
 
-    // Post-campaign items with customer details
+    // Post-campaign items
     const postItems = await q(`
-      SELECT rb.campaign_name, i.product_name,
-             rb.mobile_number, fo.customer_name,
-             fo.order_id, fo.order_date,
-             ${orderTsExpr} AS order_ts,
+      SELECT fc.campaign_name, i.product_name,
              COALESCE(r.restaurant_name, fo.restaurant_name) AS restaurant_name,
-             fo.delivery_type, fo.order_value, fo.platform,
-             COUNT(*) OVER (PARTITION BY i.product_name) AS total_qty
-      FROM (${recipientBase}) rb
-      JOIN fact_orders fo ON fo.customer_contact = rb.mobile_number
-        AND ${orderTsExpr} >= rb.campaign_run_at
-        AND ${campPlatExpr} IN ('gf_whatsapp','swayo_whatsapp','swayo_app')
+             fo.delivery_type, COUNT(*) AS qty
+      FROM fact_campaigns fc
+      JOIN fact_orders fo ON fo.customer_contact = fc.mobile_number
+        AND fo.created_at >= ${campRunExpr}
       JOIN fact_order_items i ON i.order_id = fo.order_id
       LEFT JOIN dim_restaurants r ON r.shop_id = fo.shop_id
-      WHERE rb.is_delivered = 1
+      WHERE ${cWhere} AND fc.is_delivered = 1
         AND i.product_name IS NOT NULL
         AND LOWER(TRIM(i.product_name)) NOT IN ('nan','none','null','','n/a')
-      ORDER BY total_qty DESC, i.product_name, order_ts DESC`, cv);
-    
-    // Aggregate items for bar chart
-    const postItemsSummary = await q(`
-      SELECT i.product_name, COUNT(*) AS qty
-      FROM (${recipientBase}) rb
-      JOIN fact_orders fo ON fo.customer_contact = rb.mobile_number
-        AND ${orderTsExpr} >= rb.campaign_run_at
-        AND ${campPlatExpr} IN ('gf_whatsapp','swayo_whatsapp','swayo_app')
-      JOIN fact_order_items i ON i.order_id = fo.order_id
-      WHERE rb.is_delivered = 1
-        AND i.product_name IS NOT NULL
-        AND LOWER(TRIM(i.product_name)) NOT IN ('nan','none','null','','n/a')
-      GROUP BY i.product_name
+      GROUP BY fc.campaign_name, i.product_name, r.restaurant_name, fo.restaurant_name, fo.delivery_type
       ORDER BY qty DESC LIMIT 30`, cv);
 
-    // Non-converters: received campaign but did NOT order after (simplified, no lifetime/last order)
+    // Non-converters: received campaign but did NOT order after
     const nonConverters = await q(`
-      SELECT rb.mobile_number, rb.delivery_status,
-             rb.scheduled_date AS campaign_date,
-             COALESCE(cb.customer_segment,'Unknown') AS segment
-      FROM (${recipientBase}) rb
-      LEFT JOIN agg_customer_behavior cb ON cb.customer_contact = rb.mobile_number
-      WHERE rb.is_delivered = 1
-        AND NOT EXISTS (
-          SELECT 1
+      SELECT fc.mobile_number, fc.delivery_status,
+             ${campDateExpr} AS campaign_date,
+             COALESCE(cb.customer_segment,'Unknown') AS segment,
+             COALESCE(cb.total_orders,0) AS lifetime_orders,
+             cb.last_order_date,
+             COALESCE(cb.total_gmv,0) AS lifetime_gmv
+      FROM fact_campaigns fc
+      LEFT JOIN agg_customer_behavior cb ON cb.customer_contact = fc.mobile_number
+      WHERE ${cWhere} AND fc.is_delivered = 1
+        AND fc.mobile_number NOT IN (
+          SELECT DISTINCT fo.customer_contact
           FROM fact_orders fo
-          WHERE fo.customer_contact = rb.mobile_number
-            AND ${orderTsExpr} >= rb.campaign_run_at
-            AND ${campPlatExpr} IN ('gf_whatsapp','swayo_whatsapp','swayo_app')
+          WHERE fo.created_at >= ${campRunExpr}
+            AND fo.customer_contact = fc.mobile_number
         )
-      ORDER BY rb.delivery_status DESC`, cv);
+      ORDER BY cb.total_orders DESC`, cv);
 
-    // WA Funnel activity with full journey per customer (all events with timestamps)
+    // Funnel activity for campaign recipients (WA funnel)
     const waFunnelActivity = await q(`
-      SELECT fw.customer_contact, fw.customer_name, fw.action, fw.restaurant_name,
-             fw.event_date, fw.timestamp,
-             EXISTS(
-               SELECT 1 FROM fact_orders fo
-               WHERE fo.customer_contact = fw.customer_contact
-                 AND ${orderTsExpr} >= rb.campaign_run_at
-                 AND ${campPlatExpr} IN ('gf_whatsapp','swayo_whatsapp','swayo_app')
-             ) AS did_order
+      SELECT fw.customer_contact, fw.action, fw.restaurant_name,
+              COUNT(*) AS event_count, MAX(fw.event_date) AS last_activity
       FROM fact_funnel_wa fw
-      JOIN (${recipientBase}) rb ON rb.mobile_number = fw.customer_contact
-      WHERE rb.is_delivered = 1
-        AND fw.timestamp >= rb.campaign_run_at
-      ORDER BY fw.customer_contact, fw.timestamp`, cv);
+      JOIN fact_campaigns fc ON fc.mobile_number = fw.customer_contact
+      WHERE ${cWhere}
+        AND fc.is_delivered = 1
+        AND fw.timestamp >= ${campRunExpr}
+      GROUP BY fw.customer_contact, fw.action, fw.restaurant_name
+      ORDER BY fw.customer_contact, fw.action`, cv);
     
-    // App Funnel activity with full journey per customer (all events with timestamps)
     const appFunnelActivity = await q(`
-      SELECT ff.customer_contact, COALESCE(dc.customer_name, fo2.customer_name) AS customer_name, ff.action,
-             COALESCE(r.restaurant_name, ff.shop_id) AS restaurant_name,
-             ff.event_date, ff.timestamp,
-             EXISTS(
-               SELECT 1 FROM fact_orders fo
-               WHERE fo.customer_contact = ff.customer_contact
-                 AND ${orderTsExpr} >= rb.campaign_run_at
-                 AND fo.order_id LIKE 'SWYO%'
-             ) AS did_order
+      SELECT ff.customer_contact, ff.action,
+              COALESCE(r.restaurant_name, ff.shop_id) AS restaurant_name,
+              COUNT(*) AS event_count, MAX(ff.event_date) AS last_activity
       FROM fact_funnel ff
-      JOIN (${recipientBase}) rb ON rb.mobile_number = ff.customer_contact
+      JOIN fact_campaigns fc ON fc.mobile_number = ff.customer_contact
       LEFT JOIN dim_restaurants r ON r.shop_id = ff.shop_id
-      LEFT JOIN dim_customers dc ON dc.customer_contact = ff.customer_contact
-      LEFT JOIN (SELECT customer_contact, MAX(customer_name) AS customer_name FROM fact_orders GROUP BY customer_contact) fo2 
-        ON fo2.customer_contact = ff.customer_contact
-      WHERE rb.is_delivered = 1
-        AND ff.timestamp >= rb.campaign_run_at
-      ORDER BY ff.customer_contact, ff.timestamp`, cv);
+      WHERE ${cWhere}
+        AND fc.is_delivered = 1
+        AND ff.timestamp >= ${campRunExpr}
+      GROUP BY ff.customer_contact, ff.action, r.restaurant_name, ff.shop_id
+      ORDER BY ff.customer_contact, ff.action`, cv);
 
     res.json({
-      perf, recipients, summary: summary||{}, postOrders, postItems, postItemsSummary, nonConverters,
+      perf, recipients, summary: summary||{}, postOrders, postItems, nonConverters,
       waFunnelActivity, appFunnelActivity
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1851,9 +1769,3 @@ app.get("/api/export/excel", async (req, res) => {
     const rows = await q(sql, params);
     const date = new Date().toISOString().split("T")[0];
     res.setHeader("Content-Type", "application/vnd.ms-excel; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}_${date}.xls"`);
-    res.send(toExcel(rows, filename));
-  } catch (e) { res.status(400).json({ error: e.message }); }
-});
-
-app.listen(PORT, () => console.log(`✅  Swayo Food Analysis API v7 → http://localhost:${PORT}`));

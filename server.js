@@ -85,6 +85,16 @@ function multiIn(field, rawVal, params) {
   return `${field} IN (${vals.map(() => "?").join(",")})`;
 }
 
+function canonicalPlatformExpr(alias = "fo", orderIdCol = "order_id", platformCol = "platform") {
+  const p = alias ? `${alias}.` : "";
+  return `CASE
+    WHEN ${p}${orderIdCol} LIKE 'SWYO%' THEN 'swayo_app'
+    WHEN ${p}${orderIdCol} LIKE 'SWWA%' THEN 'swayo_whatsapp'
+    WHEN ${p}${orderIdCol} LIKE 'GFFW%' OR ${p}${orderIdCol} LIKE 'GF%' THEN 'gf_whatsapp'
+    ELSE COALESCE(NULLIF(LOWER(TRIM(${p}${platformCol})),''),'unknown')
+  END`;
+}
+
 // ── ORDERS WHERE (supports multi-select platform + shop_id) ──────────────────
 function ordersWhere(query, alias = "fo") {
   const p = alias ? alias + "." : "";
@@ -93,7 +103,7 @@ function ordersWhere(query, alias = "fo") {
   if (query.to)       { c.push(`${p}order_date <= ?`);  v.push(query.to);   }
 
   // Multi-select platform
-  const platClause = multiIn(`${p}platform`, query.platform, v);
+  const platClause = multiIn(`(${canonicalPlatformExpr(alias)})`, query.platform, v);
   if (platClause) c.push(platClause);
 
   // Multi-select shop_id
@@ -122,6 +132,7 @@ app.get("/api/health", async (_, res) => {
 // ════════════════════════════════════════════════════════════════════════════
 app.get("/api/filters", async (_, res) => {
   try {
+    const platExpr = canonicalPlatformExpr("fo");
     // Deduplicated restaurants (latest name wins for same shop_id)
     const restaurants = await q(`
       SELECT fo.shop_id,
@@ -144,8 +155,9 @@ app.get("/api/filters", async (_, res) => {
       ORDER BY restaurant_name`));
 
     const platforms = await q(`
-      SELECT DISTINCT platform FROM fact_orders
-      WHERE platform IS NOT NULL AND platform NOT IN ('unknown','')
+      SELECT DISTINCT ${platExpr} AS platform
+      FROM fact_orders fo
+      WHERE ${platExpr} IN ('gf_whatsapp','swayo_whatsapp','swayo_app')
       ORDER BY platform`);
 
     const [dr] = await q(`
@@ -157,7 +169,7 @@ app.get("/api/filters", async (_, res) => {
     const campaigns = await q(`
       SELECT campaign_name,
              GROUP_CONCAT(DISTINCT campaign_id ORDER BY campaign_id) AS campaign_ids,
-             MIN(scheduled_date) AS scheduled_date,
+             DATE_FORMAT(MIN(DATE_ADD(scheduled_date, INTERVAL 330 MINUTE)), '%Y-%m-%d') AS scheduled_date,
              COUNT(*) AS recipient_count
       FROM fact_campaigns
       GROUP BY campaign_name
@@ -183,6 +195,8 @@ app.get("/api/filters", async (_, res) => {
 // ════════════════════════════════════════════════════════════════════════════
 app.get("/api/overview", async (req, res) => {
   try {
+    const platExpr = canonicalPlatformExpr("fo");
+    const ordersFrom = `FROM (SELECT fo.*, ${platExpr} AS canonical_platform FROM fact_orders fo) fo`;
     const { where, vals } = ordersWhere(req.query);
 
     const [kpis] = await q(`
@@ -201,7 +215,7 @@ app.get("/api/overview", async (req, res) => {
         COALESCE(SUM(fo.packing_charge),0)                                       AS total_packing,
         COALESCE(SUM(fo.delivery_charge),0)                                      AS total_delivery,
         COALESCE(SUM(fo.tax),0)                                                  AS total_tax
-      FROM fact_orders fo WHERE ${where}`, vals);
+      ${ordersFrom} WHERE ${where}`, vals);
 
     // Month-on-Month (distinct order_id to avoid dupes)
     const monthly = await q(`
@@ -213,7 +227,7 @@ app.get("/api/overview", async (req, res) => {
              ROUND(AVG(fo.order_value),2) AS aov,
              COUNT(DISTINCT fo.customer_contact) AS unique_customers,
              SUM(fo.is_cancelled) AS cancelled
-      FROM fact_orders fo WHERE ${where}
+      ${ordersFrom} WHERE ${where}
       GROUP BY fo.order_year, fo.order_month, fo.order_month_name
       ORDER BY fo.order_year, fo.order_month`, vals);
 
@@ -221,51 +235,52 @@ app.get("/api/overview", async (req, res) => {
     const daily = await q(`
       SELECT fo.order_date, COUNT(DISTINCT fo.order_id) AS orders,
              SUM(fo.order_value) AS gmv, fo.order_dow AS dow
-      FROM fact_orders fo WHERE ${where}
+      ${ordersFrom} WHERE ${where}
       GROUP BY fo.order_date, fo.order_dow ORDER BY fo.order_date`, vals);
 
     // Per-platform per-day
     const dailyByPlatform = await q(`
-      SELECT fo.order_date, fo.platform,
-             COUNT(DISTINCT fo.order_id) AS orders, SUM(fo.order_value) AS gmv
-      FROM fact_orders fo WHERE ${where}
-      GROUP BY fo.order_date, fo.platform ORDER BY fo.order_date, fo.platform`, vals);
+      SELECT fo.order_date, fo.canonical_platform AS platform,
+              COUNT(DISTINCT fo.order_id) AS orders, SUM(fo.order_value) AS gmv
+      ${ordersFrom} WHERE ${where}
+      GROUP BY fo.order_date, fo.canonical_platform
+      ORDER BY fo.order_date, fo.canonical_platform`, vals);
 
     // Platform share
     const platforms = await q(`
-      SELECT fo.platform, COUNT(DISTINCT fo.order_id) AS orders,
-             SUM(fo.order_value) AS gmv, SUM(fo.net_revenue) AS net_revenue,
-             ROUND(AVG(fo.order_value),2) AS aov,
-             SUM(fo.is_cancelled) AS cancelled,
-             ROUND(SUM(fo.is_cancelled)*100.0/NULLIF(COUNT(DISTINCT fo.order_id),0),1) AS cancel_rate,
-             ROUND(SUM(fo.has_coupon)*100.0/NULLIF(COUNT(DISTINCT fo.order_id),0),1)   AS coupon_rate
-      FROM fact_orders fo WHERE ${where}
-      GROUP BY fo.platform ORDER BY orders DESC`, vals);
+      SELECT fo.canonical_platform AS platform, COUNT(DISTINCT fo.order_id) AS orders,
+              SUM(fo.order_value) AS gmv, SUM(fo.net_revenue) AS net_revenue,
+              ROUND(AVG(fo.order_value),2) AS aov,
+              SUM(fo.is_cancelled) AS cancelled,
+              ROUND(SUM(fo.is_cancelled)*100.0/NULLIF(COUNT(DISTINCT fo.order_id),0),1) AS cancel_rate,
+              ROUND(SUM(fo.has_coupon)*100.0/NULLIF(COUNT(DISTINCT fo.order_id),0),1)   AS coupon_rate
+      ${ordersFrom} WHERE ${where}
+      GROUP BY fo.canonical_platform ORDER BY orders DESC`, vals);
 
     // DoW
     const dow = await q(`
       SELECT fo.order_dow, COUNT(DISTINCT fo.order_id) AS orders,
              SUM(fo.order_value) AS gmv, ROUND(AVG(fo.order_value),2) AS aov
-      FROM fact_orders fo WHERE ${where}
+      ${ordersFrom} WHERE ${where}
       GROUP BY fo.order_dow
       ORDER BY FIELD(fo.order_dow,'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')`, vals);
 
     // Hourly
     const hourly = await q(`
       SELECT fo.order_hour, COUNT(DISTINCT fo.order_id) AS orders, SUM(fo.order_value) AS gmv
-      FROM fact_orders fo WHERE ${where}
+      ${ordersFrom} WHERE ${where}
       GROUP BY fo.order_hour ORDER BY fo.order_hour`, vals);
 
     // FIX: Delivery type — ALL types from ALL platforms, not just Swayo
     const delivery = await q(`
       SELECT
         COALESCE(fo.delivery_type, 'Unknown') AS delivery_type,
-        fo.platform,
+        fo.canonical_platform AS platform,
         COUNT(DISTINCT fo.order_id) AS cnt,
         SUM(fo.order_value) AS gmv,
         ROUND(AVG(fo.order_value),2) AS aov
-      FROM fact_orders fo WHERE ${where}
-      GROUP BY fo.delivery_type, fo.platform
+      ${ordersFrom} WHERE ${where}
+      GROUP BY fo.delivery_type, fo.canonical_platform
       ORDER BY cnt DESC`, vals);
 
     res.json({ kpis, monthly, daily, dailyByPlatform, platforms, dow, hourly, delivery });
@@ -277,10 +292,12 @@ app.get("/api/overview", async (req, res) => {
 // ════════════════════════════════════════════════════════════════════════════
 async function fetchDrillRows(base = {}) {
   const c = ["1=1"], v = [];
+  const platExpr = canonicalPlatformExpr("fo");
+  const ordersFrom = `FROM (SELECT fo.*, ${platExpr} AS canonical_platform FROM fact_orders fo) fo`;
 
   if (base.from) { c.push("fo.order_date >= ?"); v.push(base.from); }
   if (base.to)   { c.push("fo.order_date <= ?"); v.push(base.to);   }
-  const platC = multiIn("fo.platform", base.platform, v); if (platC) c.push(platC);
+  const platC = multiIn(`(${platExpr})`, base.platform, v); if (platC) c.push(platC);
   const shopC = multiIn("fo.shop_id", base.shop_id, v);   if (shopC) c.push(shopC);
 
   if (base.month_key) {
@@ -298,7 +315,7 @@ async function fetchDrillRows(base = {}) {
   const rows = await q(`
     SELECT DISTINCT
       fo.order_id, fo.order_date, fo.order_dow, fo.order_hour,
-      fo.platform,
+      fo.canonical_platform AS platform,
       COALESCE(r.restaurant_name, fo.restaurant_name, fo.shop_id) AS restaurant_name,
       fo.shop_id, fo.order_status,
       COALESCE(dc.customer_name,'—') AS customer_name,
@@ -313,7 +330,7 @@ async function fetchDrillRows(base = {}) {
       fo.delivery_type,
       fo.has_coupon, fo.coupon_value,
       fo.is_cancelled
-    FROM fact_orders fo
+    ${ordersFrom}
     LEFT JOIN dim_restaurants r        ON r.shop_id = fo.shop_id
     LEFT JOIN dim_customers dc         ON dc.customer_contact = fo.customer_contact
     LEFT JOIN agg_customer_behavior cb ON cb.customer_contact = fo.customer_contact
@@ -325,7 +342,7 @@ async function fetchDrillRows(base = {}) {
     SELECT COUNT(DISTINCT fo.order_id) AS total_orders,
            SUM(fo.order_value) AS total_gmv,
            COUNT(DISTINCT fo.customer_contact) AS unique_customers
-    FROM fact_orders fo WHERE ${c.join(" AND ")}`, v);
+    ${ordersFrom} WHERE ${c.join(" AND ")}`, v);
 
   return { rows, totals: totals || {}, count: rows.length };
 }
@@ -357,11 +374,12 @@ app.get("/api/restaurant_orders", async (req, res) => {
 // ════════════════════════════════════════════════════════════════════════════
 app.get("/api/aov_monthly", async (req, res) => {
   try {
+    const platExpr = canonicalPlatformExpr("fo");
     const { where, vals } = ordersWhere(req.query);
     const rows = await q(`
       SELECT fo.order_year, fo.order_month, fo.order_month_name,
              CONCAT(fo.order_year,'-',LPAD(fo.order_month,2,'0')) AS month_key,
-             fo.platform, COUNT(DISTINCT fo.order_id) AS orders,
+             ${platExpr} AS platform, COUNT(DISTINCT fo.order_id) AS orders,
              ROUND(AVG(fo.order_value),2) AS aov_gross,
              ROUND(AVG(fo.order_value
                - COALESCE(fo.packing_charge,0)
@@ -369,8 +387,8 @@ app.get("/api/aov_monthly", async (req, res) => {
                - COALESCE(fo.convenience_charge,0)
                - COALESCE(fo.tax,0)),2) AS aov_food_only
       FROM fact_orders fo WHERE ${where}
-      GROUP BY fo.order_year, fo.order_month, fo.order_month_name, fo.platform
-      ORDER BY fo.order_year, fo.order_month, fo.platform`, vals);
+      GROUP BY fo.order_year, fo.order_month, fo.order_month_name, ${platExpr}
+      ORDER BY fo.order_year, fo.order_month, ${platExpr}`, vals);
     res.json({ rows });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -562,9 +580,9 @@ app.get("/api/funnel_wa", async (req, res) => {
     // By campaign — grouped by campaign_name not campaign_id
     const byCampaign = await q(`
       SELECT campaign_id,
-             COUNT(*) AS total_events,
-             COUNT(DISTINCT customer_contact) AS unique_customers,
-             SUM(CASE WHEN action='ORDER' THEN 1 ELSE 0 END) AS orders
+              COUNT(*) AS total_events,
+              COUNT(DISTINCT customer_contact) AS unique_customers,
+              SUM(CASE WHEN action='ORDER' THEN 1 ELSE 0 END) AS orders
       FROM fact_funnel_wa WHERE ${fWhere}
       GROUP BY campaign_id ORDER BY orders DESC LIMIT 20`, fv);
 
@@ -590,7 +608,12 @@ app.get("/api/funnel_wa", async (req, res) => {
       .filter(r => Number(r.checkout_count) > 0 && Number(r.order_count) === 0)
       .slice(0, 100);
 
-    res.json({ stages, weeklyTrend, hourly, byRestaurant, byCampaign, cartNoCheckout, checkoutNoOrder });
+    const byCampaignNamed = (byCampaign || []).map((r) => ({
+      campaign_name: r.campaign_id || "—",
+      ...r
+    }));
+
+    res.json({ stages, weeklyTrend, hourly, byRestaurant, byCampaign: byCampaignNamed, cartNoCheckout, checkoutNoOrder });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -601,127 +624,217 @@ app.get("/api/funnel_wa", async (req, res) => {
 // ════════════════════════════════════════════════════════════════════════════
 app.get("/api/campaigns", async (req, res) => {
   try {
+    const campDateExpr = "DATE(DATE_ADD(fc.scheduled_date, INTERVAL 330 MINUTE))";
+    const campRunExpr = "COALESCE(fc.scheduled_at, fc.delivered_at, fc.read_at, fc.sent_at, DATE_ADD(fc.scheduled_date, INTERVAL 330 MINUTE))";
+    const orderTsExpr = "COALESCE(fo.created_at, CAST(CONCAT(fo.order_date, ' 00:00:00') AS DATETIME))";
+    const campPlatExpr = canonicalPlatformExpr("fo");
     // FIX: filter by campaign_name, not campaign_id
     const cc = ["1=1"], cv = [];
     if (req.query.campaign_name) { cc.push("fc.campaign_name = ?"); cv.push(req.query.campaign_name); }
-    if (req.query.from) { cc.push("DATE(fc.scheduled_date) >= ?"); cv.push(req.query.from); }
-    if (req.query.to)   { cc.push("DATE(fc.scheduled_date) <= ?"); cv.push(req.query.to); }
+    if (req.query.from) { cc.push(`${campDateExpr} >= ?`); cv.push(req.query.from); }
+    if (req.query.to)   { cc.push(`${campDateExpr} <= ?`); cv.push(req.query.to); }
     const cWhere = cc.join(" AND ");
+    const recipientBase = `
+      SELECT
+        fc.campaign_name,
+        fc.mobile_number,
+        MIN(${campDateExpr}) AS scheduled_date,
+        MIN(${campRunExpr}) AS campaign_run_at,
+        MAX(fc.is_sent) AS is_sent,
+        MAX(fc.is_delivered) AS is_delivered,
+        MAX(fc.is_read) AS is_read,
+        MAX(fc.sent_at) AS sent_at,
+        MAX(fc.delivered_at) AS delivered_at,
+        MAX(fc.read_at) AS read_at,
+        MAX(fc.pitch_response) AS pitch_response,
+        CASE
+          WHEN MAX(fc.is_read) = 1 THEN 'Read'
+          WHEN MAX(fc.is_delivered) = 1 THEN 'Delivered'
+          WHEN MAX(fc.is_sent) = 1 THEN 'Sent'
+          ELSE COALESCE(MAX(fc.delivery_status), 'Pending')
+        END AS delivery_status
+      FROM fact_campaigns fc
+      WHERE ${cWhere}
+      GROUP BY fc.campaign_name, fc.mobile_number
+    `;
 
     // Performance — grouped by campaign_name
     const perf = await q(`
-      SELECT fc.campaign_name,
-             COUNT(DISTINCT fc.mobile_number) AS total_recipients,
-             SUM(fc.is_sent) AS sent_count, SUM(fc.is_delivered) AS delivered_count,
-             SUM(fc.is_read) AS read_count,
-             ROUND(SUM(fc.is_sent)*100.0/NULLIF(COUNT(DISTINCT fc.mobile_number),0),1) AS sent_rate_pct,
-             ROUND(SUM(fc.is_delivered)*100.0/NULLIF(COUNT(DISTINCT fc.mobile_number),0),1) AS delivered_rate_pct,
-             ROUND(SUM(fc.is_read)*100.0/NULLIF(COUNT(DISTINCT fc.mobile_number),0),1) AS read_rate_pct,
-             MIN(DATE(fc.scheduled_date)) AS scheduled_date
-      FROM fact_campaigns fc WHERE ${cWhere}
-      GROUP BY fc.campaign_name
+      SELECT rb.campaign_name,
+             COUNT(DISTINCT rb.mobile_number) AS total_recipients,
+             SUM(rb.is_sent) AS sent_count,
+             SUM(rb.is_delivered) AS delivered_count,
+             SUM(rb.is_read) AS read_count,
+             ROUND(SUM(rb.is_sent)*100.0/NULLIF(COUNT(DISTINCT rb.mobile_number),0),1) AS sent_rate_pct,
+             ROUND(SUM(rb.is_delivered)*100.0/NULLIF(COUNT(DISTINCT rb.mobile_number),0),1) AS delivered_rate_pct,
+             ROUND(SUM(rb.is_read)*100.0/NULLIF(COUNT(DISTINCT rb.mobile_number),0),1) AS read_rate_pct,
+             MIN(rb.scheduled_date) AS scheduled_date
+      FROM (${recipientBase}) rb
+      GROUP BY rb.campaign_name
       ORDER BY scheduled_date DESC`, cv).catch(() => []);
+
+    const conv24 = await q(`
+      SELECT rb.campaign_name,
+             COUNT(DISTINCT rb.mobile_number) AS recipient_count,
+             COUNT(DISTINCT CASE
+               WHEN ${orderTsExpr} >= rb.campaign_run_at
+                AND ${orderTsExpr} < DATE_ADD(rb.campaign_run_at, INTERVAL 24 HOUR)
+               THEN fo.order_id END) AS orders_after_24h,
+             COUNT(DISTINCT CASE
+               WHEN ${orderTsExpr} >= rb.campaign_run_at
+                AND ${orderTsExpr} < DATE_ADD(rb.campaign_run_at, INTERVAL 24 HOUR)
+               THEN rb.mobile_number END) AS converters_24h
+      FROM (${recipientBase}) rb
+      LEFT JOIN fact_orders fo ON fo.customer_contact = rb.mobile_number
+        AND ${campPlatExpr} IN ('gf_whatsapp','swayo_whatsapp','swayo_app')
+      GROUP BY rb.campaign_name`, cv).catch(() => []);
+    const convMap = new Map(conv24.map(r => [r.campaign_name, r]));
+    perf.forEach((p) => {
+      const c = convMap.get(p.campaign_name) || {};
+      p.orders_after_24h = Number(c.orders_after_24h || 0);
+      p.conversion_rate_pct = Number(c.recipient_count || 0)
+        ? ((Number(c.converters_24h || 0) * 100) / Number(c.recipient_count)).toFixed(1)
+        : "0.0";
+    });
 
     // Individual recipients with customer behavior
     const recipients = await q(`
-      SELECT fc.campaign_name, fc.mobile_number,
-             DATE(fc.scheduled_date) AS scheduled_date,
-             fc.delivery_status, fc.is_sent, fc.is_delivered, fc.is_read,
-             fc.sent_at, fc.delivered_at, fc.read_at, fc.pitch_response,
-             COALESCE(cb.total_orders, 0) AS lifetime_orders,
+      SELECT rb.campaign_name, rb.mobile_number, rb.scheduled_date, rb.campaign_run_at,
+             rb.delivery_status, rb.is_sent, rb.is_delivered, rb.is_read,
+             rb.sent_at, rb.delivered_at, rb.read_at, rb.pitch_response,
+             COALESCE(cs.total_orders, 0) AS lifetime_orders,
              COALESCE(cb.customer_segment,'Unknown') AS segment,
-             cb.last_order_date, COALESCE(cb.total_gmv, 0) AS lifetime_gmv
-      FROM fact_campaigns fc
-      LEFT JOIN agg_customer_behavior cb ON cb.customer_contact = fc.mobile_number
-      WHERE ${cWhere}
-      ORDER BY fc.delivery_status DESC, fc.is_read DESC, fc.is_delivered DESC`, cv);
+             cs.last_order_date, COALESCE(cs.total_gmv, 0) AS lifetime_gmv
+      FROM (${recipientBase}) rb
+      LEFT JOIN agg_customer_behavior cb ON cb.customer_contact = rb.mobile_number
+      LEFT JOIN (
+        SELECT customer_contact,
+               COUNT(DISTINCT order_id) AS total_orders,
+               MAX(order_date) AS last_order_date,
+               SUM(order_value) AS total_gmv
+        FROM fact_orders
+        GROUP BY customer_contact
+      ) cs ON cs.customer_contact = rb.mobile_number
+      ORDER BY rb.delivery_status DESC, rb.is_read DESC, rb.is_delivered DESC`, cv);
 
     // Summary
     const [summary] = await q(`
-      SELECT COUNT(DISTINCT mobile_number) AS total_recipients,
-             SUM(is_sent) AS sent, SUM(is_delivered) AS delivered,
-             SUM(is_read) AS read_count,
-             ROUND(SUM(is_sent)*100.0/NULLIF(COUNT(DISTINCT mobile_number),0),1) AS sent_rate,
-             ROUND(SUM(is_delivered)*100.0/NULLIF(COUNT(DISTINCT mobile_number),0),1) AS delivered_rate,
-             ROUND(SUM(is_read)*100.0/NULLIF(COUNT(DISTINCT mobile_number),0),1) AS read_rate
-      FROM fact_campaigns WHERE ${cWhere}`, cv);
+      SELECT COUNT(DISTINCT rb.mobile_number) AS total_recipients,
+             SUM(rb.is_sent) AS sent, SUM(rb.is_delivered) AS delivered,
+             SUM(rb.is_read) AS read_count,
+             ROUND(SUM(rb.is_sent)*100.0/NULLIF(COUNT(DISTINCT rb.mobile_number),0),1) AS sent_rate,
+             ROUND(SUM(rb.is_delivered)*100.0/NULLIF(COUNT(DISTINCT rb.mobile_number),0),1) AS delivered_rate,
+             ROUND(SUM(rb.is_read)*100.0/NULLIF(COUNT(DISTINCT rb.mobile_number),0),1) AS read_rate
+      FROM (${recipientBase}) rb`, cv);
 
-    // Post-campaign orders — ALL orders by this contact (before and after), includes order_id
+    // Post-campaign orders — ALL orders by recipients (no platform filter for "before", with filter for "after")
+    // This shows full order history for all recipients (not just delivered)
     const postOrders = await q(`
-      SELECT fc.campaign_name, fc.mobile_number,
+      SELECT DISTINCT rb.campaign_name, rb.mobile_number,
              fo.order_id, fo.order_date,
-             DATE(fc.scheduled_date) AS campaign_date,
-             CASE WHEN fo.order_date >= DATE(fc.scheduled_date) THEN 'After Campaign'
+             ${orderTsExpr} AS order_ts,
+             rb.scheduled_date AS campaign_date,
+             rb.campaign_run_at,
+             CASE WHEN ${orderTsExpr} >= rb.campaign_run_at THEN 'After Campaign'
                   ELSE 'Before Campaign' END AS order_timing,
              fo.order_value, fo.platform, fo.delivery_type,
              COALESCE(r.restaurant_name, fo.restaurant_name, fo.shop_id) AS restaurant_name,
-             fo.order_status
-      FROM fact_campaigns fc
-      JOIN fact_orders fo ON fo.customer_contact = fc.mobile_number
+             fo.order_status, fo.customer_name
+      FROM (${recipientBase}) rb
+      JOIN fact_orders fo ON fo.customer_contact = rb.mobile_number
       LEFT JOIN dim_restaurants r ON r.shop_id = fo.shop_id
-      WHERE ${cWhere} AND fc.is_delivered = 1
-      ORDER BY fc.mobile_number, fo.order_date DESC`, cv);
+      ORDER BY rb.mobile_number, ${orderTsExpr} DESC`, cv);
 
-    // Post-campaign items
+    // Post-campaign items with customer details
     const postItems = await q(`
-      SELECT fc.campaign_name, i.product_name,
+      SELECT rb.campaign_name, i.product_name,
+             rb.mobile_number, fo.customer_name,
+             fo.order_id, fo.order_date,
+             ${orderTsExpr} AS order_ts,
              COALESCE(r.restaurant_name, fo.restaurant_name) AS restaurant_name,
-             fo.delivery_type, COUNT(*) AS qty
-      FROM fact_campaigns fc
-      JOIN fact_orders fo ON fo.customer_contact = fc.mobile_number
-        AND fo.order_date >= DATE(fc.scheduled_date)
+             fo.delivery_type, fo.order_value, fo.platform,
+             COUNT(*) OVER (PARTITION BY i.product_name) AS total_qty
+      FROM (${recipientBase}) rb
+      JOIN fact_orders fo ON fo.customer_contact = rb.mobile_number
+        AND ${orderTsExpr} >= rb.campaign_run_at
+        AND ${campPlatExpr} IN ('gf_whatsapp','swayo_whatsapp','swayo_app')
       JOIN fact_order_items i ON i.order_id = fo.order_id
       LEFT JOIN dim_restaurants r ON r.shop_id = fo.shop_id
-      WHERE ${cWhere} AND fc.is_delivered = 1
+      WHERE rb.is_delivered = 1
         AND i.product_name IS NOT NULL
         AND LOWER(TRIM(i.product_name)) NOT IN ('nan','none','null','','n/a')
-      GROUP BY fc.campaign_name, i.product_name, r.restaurant_name, fo.restaurant_name, fo.delivery_type
+      ORDER BY total_qty DESC, i.product_name, order_ts DESC`, cv);
+    
+    // Aggregate items for bar chart
+    const postItemsSummary = await q(`
+      SELECT i.product_name, COUNT(*) AS qty
+      FROM (${recipientBase}) rb
+      JOIN fact_orders fo ON fo.customer_contact = rb.mobile_number
+        AND ${orderTsExpr} >= rb.campaign_run_at
+        AND ${campPlatExpr} IN ('gf_whatsapp','swayo_whatsapp','swayo_app')
+      JOIN fact_order_items i ON i.order_id = fo.order_id
+      WHERE rb.is_delivered = 1
+        AND i.product_name IS NOT NULL
+        AND LOWER(TRIM(i.product_name)) NOT IN ('nan','none','null','','n/a')
+      GROUP BY i.product_name
       ORDER BY qty DESC LIMIT 30`, cv);
 
-    // Non-converters: received campaign but did NOT order after
+    // Non-converters: received campaign but did NOT order after (simplified, no lifetime/last order)
     const nonConverters = await q(`
-      SELECT fc.mobile_number, fc.delivery_status,
-             DATE(fc.scheduled_date) AS campaign_date,
-             COALESCE(cb.customer_segment,'Unknown') AS segment,
-             COALESCE(cb.total_orders,0) AS lifetime_orders,
-             cb.last_order_date,
-             COALESCE(cb.total_gmv,0) AS lifetime_gmv
-      FROM fact_campaigns fc
-      LEFT JOIN agg_customer_behavior cb ON cb.customer_contact = fc.mobile_number
-      WHERE ${cWhere} AND fc.is_delivered = 1
-        AND fc.mobile_number NOT IN (
-          SELECT DISTINCT fo.customer_contact
+      SELECT rb.mobile_number, rb.delivery_status,
+             rb.scheduled_date AS campaign_date,
+             COALESCE(cb.customer_segment,'Unknown') AS segment
+      FROM (${recipientBase}) rb
+      LEFT JOIN agg_customer_behavior cb ON cb.customer_contact = rb.mobile_number
+      WHERE rb.is_delivered = 1
+        AND NOT EXISTS (
+          SELECT 1
           FROM fact_orders fo
-          WHERE fo.order_date >= DATE(fc.scheduled_date)
-            AND fo.customer_contact = fc.mobile_number
+          WHERE fo.customer_contact = rb.mobile_number
+            AND ${orderTsExpr} >= rb.campaign_run_at
+            AND ${campPlatExpr} IN ('gf_whatsapp','swayo_whatsapp','swayo_app')
         )
-      ORDER BY cb.total_orders DESC`, cv);
+      ORDER BY rb.delivery_status DESC`, cv);
 
-    // Funnel activity for campaign recipients (WA funnel)
+    // WA Funnel activity with full journey per customer (all events with timestamps)
     const waFunnelActivity = await q(`
-      SELECT fw.customer_contact, fw.action, fw.restaurant_name,
-             COUNT(*) AS event_count, MAX(fw.event_date) AS last_activity
+      SELECT fw.customer_contact, fw.customer_name, fw.action, fw.restaurant_name,
+             fw.event_date, fw.timestamp,
+             EXISTS(
+               SELECT 1 FROM fact_orders fo
+               WHERE fo.customer_contact = fw.customer_contact
+                 AND ${orderTsExpr} >= rb.campaign_run_at
+                 AND ${campPlatExpr} IN ('gf_whatsapp','swayo_whatsapp','swayo_app')
+             ) AS did_order
       FROM fact_funnel_wa fw
-      WHERE fw.customer_contact IN (
-        SELECT DISTINCT mobile_number FROM fact_campaigns WHERE ${cWhere}
-      )
-      GROUP BY fw.customer_contact, fw.action, fw.restaurant_name
-      ORDER BY fw.customer_contact, fw.action`, cv);
+      JOIN (${recipientBase}) rb ON rb.mobile_number = fw.customer_contact
+      WHERE rb.is_delivered = 1
+        AND fw.timestamp >= rb.campaign_run_at
+      ORDER BY fw.customer_contact, fw.timestamp`, cv);
     
+    // App Funnel activity with full journey per customer (all events with timestamps)
     const appFunnelActivity = await q(`
-      SELECT ff.customer_contact, ff.action,
+      SELECT ff.customer_contact, COALESCE(dc.customer_name, fo2.customer_name) AS customer_name, ff.action,
              COALESCE(r.restaurant_name, ff.shop_id) AS restaurant_name,
-             COUNT(*) AS event_count, MAX(ff.event_date) AS last_activity
+             ff.event_date, ff.timestamp,
+             EXISTS(
+               SELECT 1 FROM fact_orders fo
+               WHERE fo.customer_contact = ff.customer_contact
+                 AND ${orderTsExpr} >= rb.campaign_run_at
+                 AND fo.order_id LIKE 'SWYO%'
+             ) AS did_order
       FROM fact_funnel ff
+      JOIN (${recipientBase}) rb ON rb.mobile_number = ff.customer_contact
       LEFT JOIN dim_restaurants r ON r.shop_id = ff.shop_id
-      WHERE ff.customer_contact IN (
-        SELECT DISTINCT mobile_number FROM fact_campaigns WHERE ${cWhere}
-      )
-      GROUP BY ff.customer_contact, ff.action, r.restaurant_name, ff.shop_id
-      ORDER BY ff.customer_contact, ff.action`, cv);
+      LEFT JOIN dim_customers dc ON dc.customer_contact = ff.customer_contact
+      LEFT JOIN (SELECT customer_contact, MAX(customer_name) AS customer_name FROM fact_orders GROUP BY customer_contact) fo2 
+        ON fo2.customer_contact = ff.customer_contact
+      WHERE rb.is_delivered = 1
+        AND ff.timestamp >= rb.campaign_run_at
+      ORDER BY ff.customer_contact, ff.timestamp`, cv);
 
     res.json({
-      perf, recipients, summary: summary||{}, postOrders, postItems, nonConverters,
+      perf, recipients, summary: summary||{}, postOrders, postItems, postItemsSummary, nonConverters,
       waFunnelActivity, appFunnelActivity
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -912,12 +1025,14 @@ app.get("/api/funnel_dropoffs", async (req, res) => {
 // ════════════════════════════════════════════════════════════════════════════
 app.get("/api/geo", async (req, res) => {
   try {
+    const geoPlatExpr = canonicalPlatformExpr("g");
+    const geoFrom = `FROM (SELECT g.*, ${geoPlatExpr} AS canonical_platform FROM fact_order_geo g) g`;
     const gc = ["1=1"], gv = [];
     if (req.query.from)     { gc.push("g.order_date >= ?");        gv.push(req.query.from); }
     if (req.query.to)       { gc.push("g.order_date <= ?");        gv.push(req.query.to); }
     if (req.query.max_dist) { gc.push("g.delivery_distance <= ?"); gv.push(req.query.max_dist); }
     if (req.query.min_dist) { gc.push("g.delivery_distance >= ?"); gv.push(req.query.min_dist); }
-    const pC = multiIn("g.platform", req.query.platform, gv);
+    const pC = multiIn("g.canonical_platform", req.query.platform, gv);
     if (pC) gc.push(pC);
     const sC = multiIn("g.restaurant_name", req.query.restaurant_name, gv);
     // Don't add restaurant_name multi — use shop_id
@@ -930,12 +1045,12 @@ app.get("/api/geo", async (req, res) => {
     const gWhere = gc.join(" AND ");
 
     const byCustomerPincode = await q(`
-      SELECT g.customer_pincode, g.restaurant_name, g.platform,
+      SELECT g.customer_pincode, g.restaurant_name, g.canonical_platform AS platform,
              COUNT(*) AS orders,
              ROUND(AVG(g.delivery_distance),2) AS avg_distance
-      FROM fact_order_geo g
+      ${geoFrom}
       WHERE ${gWhere} AND g.customer_pincode IS NOT NULL
-      GROUP BY g.customer_pincode, g.restaurant_name, g.platform
+      GROUP BY g.customer_pincode, g.restaurant_name, g.canonical_platform
       ORDER BY orders DESC LIMIT 100`, gv);
 
     const byRestaurantPincode = await q(`
@@ -943,7 +1058,7 @@ app.get("/api/geo", async (req, res) => {
              COUNT(*) AS orders,
              COUNT(DISTINCT g.customer_pincode) AS unique_customer_pincodes,
              ROUND(AVG(g.delivery_distance),2) AS avg_distance
-      FROM fact_order_geo g
+      ${geoFrom}
       WHERE ${gWhere} AND g.restaurant_pincode IS NOT NULL
       GROUP BY g.restaurant_pincode, g.restaurant_name
       ORDER BY orders DESC`, gv);
@@ -959,22 +1074,22 @@ app.get("/api/geo", async (req, res) => {
              END AS distance_bucket,
              COUNT(*) AS orders,
              ROUND(AVG(g.delivery_distance),2) AS avg_dist,
-             g.platform
-      FROM fact_order_geo g
+             g.canonical_platform AS platform
+      ${geoFrom}
       WHERE ${gWhere} AND g.delivery_distance IS NOT NULL
-      GROUP BY distance_bucket, g.platform
+      GROUP BY distance_bucket, g.canonical_platform
       ORDER BY MIN(g.delivery_distance)`, gv);
 
     // Pickup candidates — within threshold km (default 2)
     const threshKm = parseFloat(req.query.pickup_threshold) || 2;
     const pickupCandidates = await q(`
       SELECT g.customer_contact, g.customer_pincode, g.restaurant_name,
-             g.delivery_distance, g.platform, g.order_date,
+             g.delivery_distance, g.canonical_platform AS platform, g.order_date,
              g.delivery_address,
              COALESCE(dc.customer_name,'—') AS customer_name,
              COALESCE(cb.customer_segment,'Unknown') AS segment,
              COALESCE(cb.total_orders,1) AS lifetime_orders
-      FROM fact_order_geo g
+      ${geoFrom}
       LEFT JOIN dim_customers dc ON dc.customer_contact = g.customer_contact
       LEFT JOIN agg_customer_behavior cb ON cb.customer_contact = g.customer_contact
       WHERE ${gWhere}
@@ -989,7 +1104,7 @@ app.get("/api/geo", async (req, res) => {
              g.restaurant_name, g.delivery_distance, g.order_date,
              COALESCE(dc.customer_name,'—') AS customer_name,
              COALESCE(cb.total_orders,1) AS lifetime_orders
-      FROM fact_order_geo g
+      ${geoFrom}
       JOIN fact_orders fo ON fo.order_id = g.order_id
       LEFT JOIN dim_customers dc ON dc.customer_contact = g.customer_contact
       LEFT JOIN agg_customer_behavior cb ON cb.customer_contact = g.customer_contact
@@ -1008,7 +1123,7 @@ app.get("/api/geo", async (req, res) => {
              MIN(g.delivery_distance) AS min_distance,
              MAX(g.delivery_distance) AS max_distance,
              SUM(CASE WHEN g.delivery_distance <= 2 THEN 1 ELSE 0 END) AS within_2km
-      FROM fact_order_geo g WHERE ${gWhere}`, gv);
+      ${geoFrom} WHERE ${gWhere}`, gv);
 
     res.json({ byCustomerPincode, byRestaurantPincode, distBuckets, pickupCandidates, delivToPickup, kpis: geoKpis });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1034,7 +1149,7 @@ app.get("/api/customers", async (req, res) => {
              COALESCE(dc.customer_name,'—') AS customer_name,
              cb.customer_segment, cb.total_orders, cb.total_gmv,
              cb.first_order_date, cb.last_order_date,
-             cb.platforms_used, cb.coupon_usage, cb.cancellation_rate
+             cb.platforms_used, cb.coupon_usage, cb.cancelled_orders
       FROM agg_customer_behavior cb
       LEFT JOIN dim_customers dc ON dc.customer_contact = cb.customer_contact
       ORDER BY cb.total_orders DESC LIMIT 50`);
@@ -1080,22 +1195,23 @@ app.get("/api/customers", async (req, res) => {
 // ════════════════════════════════════════════════════════════════════════════
 app.get("/api/products", async (req, res) => {
   try {
+    const itemPlatExpr = canonicalPlatformExpr("fo");
+    const itemOrdersFrom = `FROM fact_order_items i JOIN (SELECT fo.*, ${itemPlatExpr} AS canonical_platform FROM fact_orders fo) fo ON fo.order_id = i.order_id`;
     const { where, vals } = ordersWhere(req.query);
 
     const allItems = await q(`
-      SELECT i.platform, i.product_name, fo.shop_id,
+      SELECT fo.canonical_platform AS platform, i.product_name, fo.shop_id,
              COALESCE(r.restaurant_name, fo.restaurant_name, fo.shop_id) AS restaurant_name,
              fo.order_year, fo.order_month,
              CONCAT(fo.order_year,'-',LPAD(fo.order_month,2,'0')) AS month_key,
              COUNT(DISTINCT fo.order_id) AS qty
-      FROM fact_order_items i
-      JOIN fact_orders fo ON fo.order_id = i.order_id
+      ${itemOrdersFrom}
       LEFT JOIN dim_restaurants r ON r.shop_id = fo.shop_id
       WHERE ${where}
         AND i.product_name IS NOT NULL
         AND LOWER(TRIM(i.product_name)) NOT IN ('nan','none','null','','n/a')
         AND LENGTH(TRIM(i.product_name)) > 1
-      GROUP BY i.platform, i.product_name, fo.shop_id,
+      GROUP BY fo.canonical_platform, i.product_name, fo.shop_id,
                r.restaurant_name, fo.restaurant_name, fo.order_year, fo.order_month
       ORDER BY fo.order_year, fo.order_month, qty DESC`, vals);
 
@@ -1337,6 +1453,8 @@ app.get("/api/coupons", async (req, res) => {
 // ════════════════════════════════════════════════════════════════════════════
 app.get("/api/pnl", async (req, res) => {
   try {
+    const platExpr = canonicalPlatformExpr("fo");
+    const ordersFrom = `FROM (SELECT fo.*, ${platExpr} AS canonical_platform FROM fact_orders fo) fo`;
     const { where, vals } = ordersWhere(req.query);
     const monthly = await q(`
       SELECT CONCAT(fo.order_year,'-',LPAD(fo.order_month,2,'0')) AS month_key,
@@ -1355,7 +1473,7 @@ app.get("/api/pnl", async (req, res) => {
              COALESCE(SUM(fo.tax),0) AS tax,
              COUNT(DISTINCT fo.order_id) AS orders,
              ROUND(AVG(fo.order_value),2) AS aov
-      FROM fact_orders fo WHERE ${where}
+      ${ordersFrom} WHERE ${where}
       GROUP BY fo.order_year, fo.order_month, fo.order_month_name
       ORDER BY fo.order_year, fo.order_month`, vals);
 
@@ -1370,18 +1488,18 @@ app.get("/api/pnl", async (req, res) => {
              COALESCE(SUM(fo.delivery_charge),0) AS delivery_charge,
              COALESCE(SUM(fo.convenience_charge),0) AS convenience_charge,
              COALESCE(SUM(fo.tax),0) AS tax
-      FROM fact_orders fo WHERE ${where}`, vals);
+      ${ordersFrom} WHERE ${where}`, vals);
 
     // Platform breakdown for drill-down
     const byPlatform = await q(`
-      SELECT fo.platform,
+      SELECT fo.canonical_platform AS platform,
              SUM(fo.order_value) AS gmv,
              COALESCE(SUM(fo.discount),0) AS total_discount,
              COALESCE(SUM(fo.packing_charge),0) AS packing_charge,
              COALESCE(SUM(fo.tax),0) AS tax,
              SUM(fo.net_revenue) AS net_revenue
-      FROM fact_orders fo WHERE ${where}
-      GROUP BY fo.platform`, vals);
+      ${ordersFrom} WHERE ${where}
+      GROUP BY fo.canonical_platform`, vals);
 
     res.json({ monthly, totals, byPlatform });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1506,9 +1624,10 @@ function buildExportQuery(query) {
 
   if (type === "orders") {
     const w = ["1=1"];
+    const platExpr = canonicalPlatformExpr("fo");
     if (query.from)         { w.push("fo.order_date >= ?");   params.push(query.from); }
     if (query.to)           { w.push("fo.order_date <= ?");   params.push(query.to); }
-    const pC = mIn("fo.platform",  query.platform); if (pC) w.push(pC);
+    const pC = mIn(`(${platExpr})`,  query.platform); if (pC) w.push(pC);
     const sC = mIn("fo.shop_id",   query.shop_id);  if (sC) w.push(sC);
     if (query.delivery_type) { w.push("fo.delivery_type = ?"); params.push(query.delivery_type); }
     if (query.order_status)  { w.push("fo.order_status = ?");  params.push(query.order_status); }
@@ -1516,7 +1635,7 @@ function buildExportQuery(query) {
     if (query.customer_segment) { w.push("cb.customer_segment = ?"); params.push(query.customer_segment); }
     const sql = `
       SELECT DISTINCT fo.order_id, fo.order_date, fo.order_month_name AS month,
-             fo.order_dow, fo.order_hour, fo.platform,
+             fo.order_dow, fo.order_hour, ${platExpr} AS platform,
              COALESCE(r.restaurant_name, fo.restaurant_name, fo.shop_id) AS restaurant_name,
              fo.shop_id, fo.order_status, dc.customer_name, fo.customer_contact,
              COALESCE(cb.customer_segment,'Unknown') AS customer_segment,
@@ -1540,9 +1659,9 @@ function buildExportQuery(query) {
     const sql = `
       SELECT cb.customer_contact, dc.customer_name, dc.platform AS signup_platform,
              cb.customer_segment, cb.total_orders, cb.total_gmv,
-             ROUND(cb.avg_order_value,2) AS avg_order_value,
+             ROUND(cb.total_gmv/NULLIF(cb.total_orders,0),2) AS avg_order_value,
              cb.total_discount, cb.coupon_usage, cb.cancelled_orders,
-             ROUND(cb.cancellation_rate,2) AS cancellation_rate,
+             ROUND(cb.cancelled_orders*100.0/NULLIF(cb.total_orders,0),2) AS cancellation_rate,
              cb.platforms_used, cb.first_order_date, cb.last_order_date,
              DATEDIFF(cb.last_order_date, cb.first_order_date) AS active_days
       FROM agg_customer_behavior cb
@@ -1590,13 +1709,14 @@ function buildExportQuery(query) {
 
   if (type === "items") {
     const w = ["1=1"];
+    const platExpr = canonicalPlatformExpr("fo");
     if (query.from)     { w.push("fo.order_date >= ?"); params.push(query.from); }
     if (query.to)       { w.push("fo.order_date <= ?"); params.push(query.to); }
-    const pC = mIn("fo.platform", query.platform); if(pC) w.push(pC);
+    const pC = mIn(`(${platExpr})`, query.platform); if(pC) w.push(pC);
     const sC = mIn("fo.shop_id",  query.shop_id);  if(sC) w.push(sC);
     if (query.product_name) { w.push("i.product_name LIKE ?"); params.push(`%${query.product_name}%`); }
     const sql = `
-      SELECT fo.order_date, fo.order_id, fo.platform,
+      SELECT fo.order_date, fo.order_id, ${platExpr} AS platform,
              COALESCE(r.restaurant_name, fo.restaurant_name, fo.shop_id) AS restaurant_name,
              i.product_name, dc.customer_name, fo.customer_contact,
              COALESCE(cb.customer_segment,'Unknown') AS customer_segment, fo.order_value
@@ -1614,10 +1734,11 @@ function buildExportQuery(query) {
 
   if (type === "coupons") {
     const w = ["fo.has_coupon = 1"];
+    const platExpr = canonicalPlatformExpr("fo");
     if (query.from) { w.push("fo.order_date >= ?"); params.push(query.from); }
     if (query.to)   { w.push("fo.order_date <= ?"); params.push(query.to); }
     const sql = `
-      SELECT DISTINCT fo.order_id, fo.order_date, fo.platform,
+      SELECT DISTINCT fo.order_id, fo.order_date, ${platExpr} AS platform,
              COALESCE(r.restaurant_name, fo.restaurant_name) AS restaurant_name,
              fo.customer_contact, dc.customer_name,
              fo.coupon_value, COALESCE(fo.discount,0) AS discount_amount,
@@ -1631,9 +1752,10 @@ function buildExportQuery(query) {
 
   if (type === "drill") {
     const w = ["1=1"];
+    const platExpr = canonicalPlatformExpr("fo");
     if (query.from) { w.push("fo.order_date >= ?"); params.push(query.from); }
     if (query.to)   { w.push("fo.order_date <= ?"); params.push(query.to); }
-    const pC = mIn("fo.platform", query.platform); if (pC) w.push(pC);
+    const pC = mIn(`(${platExpr})`, query.platform); if (pC) w.push(pC);
     const sC = mIn("fo.shop_id", query.shop_id);   if (sC) w.push(sC);
     if (query.month_key) {
       const [yr, mo] = String(query.month_key).split("-");
@@ -1653,7 +1775,7 @@ function buildExportQuery(query) {
       params.push(query.product_name);
     }
     const sql = `
-      SELECT DISTINCT fo.order_id, fo.order_date, fo.order_dow, fo.order_hour, fo.platform,
+      SELECT DISTINCT fo.order_id, fo.order_date, fo.order_dow, fo.order_hour, ${platExpr} AS platform,
              COALESCE(r.restaurant_name, fo.restaurant_name, fo.shop_id) AS restaurant_name,
              fo.shop_id, fo.order_status, COALESCE(dc.customer_name,'—') AS customer_name,
              fo.customer_contact, COALESCE(cb.customer_segment,'Unknown') AS customer_segment,

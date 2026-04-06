@@ -82,6 +82,10 @@ button{font-family:inherit}
   color:var(--t1);padding:5px 9px;border-radius:7px;
   font-size:11px;cursor:pointer;outline:none;font-family:inherit;
 }
+.fsel option{
+  background:var(--bg2);
+  color:var(--t1);
+}
 .fsel:focus,.finp:focus{border-color:var(--blue);box-shadow:0 0 0 2px var(--glow-b)}
 .finp::placeholder{color:var(--t3)}
 .fbtn{
@@ -93,8 +97,128 @@ button{font-family:inherit}
 .fbtn:hover{background:var(--blue-d)}
 .fbtn.sec{background:var(--bg2);color:var(--t2);border:1px solid var(--bdr2)}
 .fbtn.sec:hover{border-color:var(--blue);color:var(--blue)}
+/* ─── CUSTOM MULTI-SELECT DROPDOWN ─────────────────────────────── */
+.ms-wrap{position:relative;display:inline-block}
+.ms-btn{
+  background:var(--bg2);border:1px solid var(--bdr2);
+  color:var(--t1);padding:6px 28px 6px 10px;border-radius:8px;
+  font-size:11px;cursor:pointer;min-width:130px;
+  display:flex;align-items:center;gap:6px;
+  position:relative;transition:border-color .15s;
+}
+.ms-btn:hover{border-color:var(--blue)}
+.ms-btn::after{
+  content:'▾';position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  font-size:10px;color:var(--t3);
+}
+.ms-btn .ms-count{
+  background:var(--blue);color:#fff;font-size:9px;
+  padding:2px 6px;border-radius:10px;font-weight:700;
+}
+.ms-btn .ms-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.ms-panel{
+  position:absolute;top:100%;left:0;margin-top:4px;
+  background:var(--bg1);border:1px solid var(--bdr2);
+  border-radius:10px;min-width:220px;max-height:320px;
+  box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:400;
+  display:none;flex-direction:column;overflow:hidden;
+}
+.ms-panel.open{display:flex}
+.ms-search{
+  padding:8px;border-bottom:1px solid var(--bdr);
+}
+.ms-search input{
+  width:100%;background:var(--bg2);border:1px solid var(--bdr2);
+  color:var(--t1);padding:6px 10px;border-radius:6px;font-size:11px;
+  outline:none;
+}
+.ms-search input:focus{border-color:var(--blue)}
+.ms-search input::placeholder{color:var(--t3)}
+.ms-list{
+  flex:1;overflow-y:auto;padding:6px 0;
+}
+.ms-item{
+  display:flex;align-items:center;gap:8px;padding:7px 12px;
+  cursor:pointer;font-size:11px;color:var(--t2);transition:background .1s;
+}
+.ms-item:hover{background:rgba(59,130,246,.1);color:var(--t1)}
+.ms-item.selected{background:rgba(59,130,246,.15);color:var(--blue);font-weight:600}
+.ms-item input[type="checkbox"]{
+  accent-color:var(--blue);width:14px;height:14px;cursor:pointer;
+}
+.ms-actions{
+  padding:8px;border-top:1px solid var(--bdr);
+  display:flex;gap:6px;justify-content:flex-end;
+}
+.ms-actions button{
+  background:var(--bg2);border:1px solid var(--bdr2);
+  color:var(--t2);padding:4px 10px;border-radius:6px;
+  font-size:10px;cursor:pointer;
+}
+.ms-actions button:hover{border-color:var(--blue);color:var(--blue)}
+.ms-actions button.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+.ms-actions button.primary:hover{background:var(--blue-d)}
 .spin{display:inline-block;width:12px;height:12px;border:2px solid var(--bdr2);border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* ─── FUNNEL JOURNEY VISUALIZATION ──────────────────────────── */
+.funnel-user{
+  background:var(--bg1);border:1px solid var(--bdr);border-radius:10px;
+  padding:12px;margin-bottom:10px;
+}
+.funnel-user.ordered{border-color:var(--green);background:rgba(16,185,129,.05)}
+.funnel-user.no-order{border-color:var(--orange);background:rgba(249,115,22,.05)}
+.funnel-hdr{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.funnel-contact{font-family:monospace;font-size:11px;color:var(--blue);font-weight:600}
+.funnel-name{font-size:11px;color:var(--t2)}
+.funnel-badge{font-size:9px;padding:2px 7px;border-radius:10px;font-weight:700}
+.funnel-badge.yes{background:var(--green);color:#fff}
+.funnel-badge.no{background:var(--orange);color:#fff}
+.funnel-steps{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.funnel-step{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:10px;padding:4px 8px;border-radius:6px;
+  background:var(--bg2);color:var(--t2);
+}
+.funnel-step.plp{border-left:3px solid var(--blue)}
+.funnel-step.view_cart,.funnel-step.cart{border-left:3px solid var(--orange)}
+.funnel-step.checkout{border-left:3px solid var(--purple)}
+.funnel-step.order_placed,.funnel-step.order{border-left:3px solid var(--green)}
+.funnel-step .step-time{font-size:9px;color:var(--t3)}
+.funnel-step .step-rest{font-size:9px;color:var(--t3);max-width:100px;overflow:hidden;text-overflow:ellipsis}
+.funnel-arrow{color:var(--t3);font-size:10px}
+.funnel-scroll{max-height:400px;overflow-y:auto}
+
+/* ─── CAMPAIGN QUICK FILTER BUTTONS ─────────────────────────── */
+.camp-qbtn{
+  background:var(--bg2);border:1px solid var(--bdr2);
+  color:var(--t2);padding:8px 14px;border-radius:8px;
+  font-size:11px;cursor:pointer;transition:all .15s;
+  display:flex;align-items:center;gap:6px;
+}
+.camp-qbtn:hover{border-color:var(--blue);color:var(--blue)}
+.camp-qbtn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.camp-qbtn span{
+  background:rgba(255,255,255,.2);padding:2px 6px;border-radius:4px;
+  font-weight:700;font-size:10px;
+}
+.camp-qbtn.active span{background:rgba(255,255,255,.3)}
+
+/* ─── COLLAPSIBLE SECTIONS ──────────────────────────────────── */
+.collapsible .collapse-hdr{
+  cursor:pointer;display:flex;align-items:center;
+  user-select:none;
+}
+.collapsible .collapse-hdr:hover{color:var(--blue)}
+.collapsible .collapse-icon{
+  font-size:10px;color:var(--t3);transition:transform .2s;
+  margin-left:8px;
+}
+.collapsible.open .collapse-icon{transform:rotate(180deg)}
+.collapsible .collapse-body{
+  padding-top:10px;border-top:1px solid var(--bdr);
+  margin-top:10px;
+}
 
 /* ─── MODAL (drill-down / expand) ───────────────────────────── */
 .modal-overlay{
@@ -400,29 +524,56 @@ td.bad{color:var(--red)}
   </div>
 </div>
 
-<!-- ══ FILTER BAR — multi-select ════════════════════════════════ -->
+<!-- ══ FILTER BAR — custom multi-select ════════════════════════════════ -->
 <div class="fbar">
   <label>From</label>
   <input type="date" id="f-from" class="fsel finp"/>
   <label>To</label>
   <input type="date" id="f-to" class="fsel finp"/>
+
   <label>Platform</label>
-  <!-- Multi-select: hold Ctrl/Cmd to select multiple -->
-  <select id="f-plat" class="fsel" multiple size="1" style="min-width:130px;height:30px"
-          title="Hold Ctrl/Cmd to select multiple">
-    <option value="gf_whatsapp">GrabFood WhatsApp</option>
-    <option value="swayo_whatsapp">Swayo WhatsApp</option>
-    <option value="swayo_app">Swayo App</option>
-  </select>
+  <div class="ms-wrap" id="ms-plat-wrap">
+    <button type="button" class="ms-btn" onclick="togglePanel('ms-plat')">
+      <span class="ms-label" id="ms-plat-label">All Platforms</span>
+    </button>
+    <div class="ms-panel" id="ms-plat-panel">
+      <div class="ms-search"><input type="text" placeholder="Search platforms…" onkeyup="filterMSList('ms-plat')"/></div>
+      <div class="ms-list" id="ms-plat-list">
+        <label class="ms-item"><input type="checkbox" value="gf_whatsapp" onchange="updateMSLabel('ms-plat')"/> GrabFood WhatsApp</label>
+        <label class="ms-item"><input type="checkbox" value="swayo_whatsapp" onchange="updateMSLabel('ms-plat')"/> Swayo WhatsApp</label>
+        <label class="ms-item"><input type="checkbox" value="swayo_app" onchange="updateMSLabel('ms-plat')"/> Swayo App</label>
+      </div>
+      <div class="ms-actions">
+        <button type="button" onclick="clearMS('ms-plat')">Clear</button>
+        <button type="button" onclick="selectAllMS('ms-plat')">All</button>
+        <button type="button" class="primary" onclick="closePanel('ms-plat')">Done</button>
+      </div>
+    </div>
+  </div>
+
   <label>Restaurant</label>
-  <select id="f-rest" class="fsel" multiple size="1" style="max-width:180px;height:30px"
-          title="Hold Ctrl/Cmd to select multiple">
-    <option value="">All Restaurants</option>
-  </select>
+  <div class="ms-wrap" id="ms-rest-wrap">
+    <button type="button" class="ms-btn" onclick="togglePanel('ms-rest')">
+      <span class="ms-label" id="ms-rest-label">All Restaurants</span>
+    </button>
+    <div class="ms-panel" id="ms-rest-panel">
+      <div class="ms-search"><input type="text" placeholder="Search restaurants…" onkeyup="filterMSList('ms-rest')"/></div>
+      <div class="ms-list" id="ms-rest-list">
+        <!-- populated dynamically -->
+      </div>
+      <div class="ms-actions">
+        <button type="button" onclick="clearMS('ms-rest')">Clear</button>
+        <button type="button" onclick="selectAllMS('ms-rest')">All</button>
+        <button type="button" class="primary" onclick="closePanel('ms-rest')">Done</button>
+      </div>
+    </div>
+  </div>
+
   <label>Delivery</label>
-  <select id="f-dtype" class="fsel" style="min-width:90px">
+  <select id="f-dtype" class="fsel" style="min-width:100px">
     <option value="">All Types</option>
   </select>
+
   <button class="fbtn" onclick="applyFilters()">▶ Apply</button>
   <button class="fbtn sec" onclick="resetFilters()">↺ Reset</button>
   <span id="loading-ind" style="display:none;align-items:center;gap:6px;font-size:11px;color:var(--t3)">
@@ -680,10 +831,10 @@ td.bad{color:var(--red)}
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════
-     PAGE 7 — CAMPAIGNS
+     PAGE 7 — CAMPAIGNS (Redesigned)
 ══════════════════════════════════════════════════════════════ -->
 <div id="pg-campaigns" class="page">
-  <!-- Campaign selector -->
+  <!-- Campaign selector bar -->
   <div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:10px;padding:14px 16px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
     <div>
       <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">Campaign</div>
@@ -704,55 +855,109 @@ td.bad{color:var(--red)}
     <button class="fbtn sec" onclick="exportCampaign('excel')">⬇ Excel</button>
   </div>
 
-  <!-- Delivery funnel summary -->
-  <div class="card" style="margin-bottom:12px" id="camp-summary-card">
-    <div class="card-title">📣 Campaign Delivery Summary</div>
-    <div class="delivery-steps" id="camp-delivery-steps">
+  <!-- Quick filter buttons -->
+  <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap" id="camp-quick-btns">
+    <button class="camp-qbtn active" data-filter="all" onclick="quickFilterCamp('all')">📋 All Recipients <span id="qb-all">—</span></button>
+    <button class="camp-qbtn" data-filter="Delivered" onclick="quickFilterCamp('Delivered')">✅ Delivered <span id="qb-delivered">—</span></button>
+    <button class="camp-qbtn" data-filter="Read" onclick="quickFilterCamp('Read')">👁 Read <span id="qb-read">—</span></button>
+    <button class="camp-qbtn" data-filter="post" onclick="quickFilterCamp('post')">🛒 Post-Campaign Orders <span id="qb-post">—</span></button>
+    <button class="camp-qbtn" data-filter="nonconv" onclick="quickFilterCamp('nonconv')">❌ Non-Converters <span id="qb-nonconv">—</span></button>
+  </div>
+
+  <!-- Delivery funnel summary (compact) -->
+  <div class="card" style="margin-bottom:12px;padding:12px 16px" id="camp-summary-card">
+    <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap" id="camp-delivery-steps">
       <div class="loading"><span class="spin"></span> Load a campaign above</div>
     </div>
   </div>
 
-  <div class="kpi-grid k5" id="camp-kpis"></div>
-
-  <div class="row">
-    <div class="card c2">
-      <div class="card-title">👥 All Recipients — Delivery Status</div>
-      <div class="tbl-wrap" id="camp-recipients"></div>
+  <!-- Main content grid -->
+  <div style="display:grid;grid-template-columns:1fr 1.2fr;gap:12px;align-items:start">
+    
+    <!-- LEFT: Recipients (sticky) -->
+    <div class="card" style="position:sticky;top:120px;max-height:calc(100vh - 180px);overflow:hidden;display:flex;flex-direction:column">
+      <div class="card-title" style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        👥 Recipients
+        <select id="camp-status-filter" class="fsel" onchange="filterCampRecipients()" style="font-size:10px;padding:4px 8px;margin-left:auto;max-width:100px">
+          <option value="">All Status</option>
+          <option value="Read">Read</option>
+          <option value="Delivered">Delivered</option>
+          <option value="Sent">Sent</option>
+          <option value="Pending">Pending</option>
+        </select>
+      </div>
+      <div class="tbl-wrap" id="camp-recipients" style="flex:1;overflow-y:auto"></div>
     </div>
-    <div class="card c1">
-      <div class="card-title">🛒 Post-Campaign Orders</div>
-      <div class="tbl-wrap" id="camp-post-orders"></div>
-      <div class="note g" id="camp-conversion-note" style="margin-top:10px;display:none"></div>
+
+    <!-- RIGHT: Orders and other content -->
+    <div style="display:flex;flex-direction:column;gap:12px">
+      
+      <!-- After Campaign Orders (PRIMARY - always expanded) -->
+      <div class="card">
+        <div class="card-title" style="color:var(--green)">✅ After Campaign Orders</div>
+        <div class="tbl-wrap" id="camp-after-orders" style="max-height:300px;overflow-y:auto"></div>
+      </div>
+
+      <!-- Before Campaign Orders (COLLAPSIBLE) -->
+      <div class="card collapsible" id="camp-before-card">
+        <div class="card-title collapse-hdr" onclick="toggleCollapse('camp-before-card')">
+          <span>📜 Before Campaign Orders</span>
+          <span class="collapse-icon">▼</span>
+        </div>
+        <div class="collapse-body" style="display:none">
+          <div class="tbl-wrap" id="camp-before-orders" style="max-height:250px;overflow-y:auto"></div>
+        </div>
+      </div>
+
+      <!-- Items Ordered After Campaign -->
+      <div class="card">
+        <div class="card-title">🍱 Items Ordered After Campaign</div>
+        <div class="bars" id="camp-post-items"></div>
+      </div>
+
+      <!-- Non-Converters (COLLAPSIBLE) -->
+      <div class="card collapsible" id="camp-nonconv-card">
+        <div class="card-title collapse-hdr" onclick="toggleCollapse('camp-nonconv-card')" style="display:flex;align-items:center">
+          <span>❌ Non-Converters (Delivered, No Order)</span>
+          <span class="collapse-icon" style="margin-left:auto">▼</span>
+        </div>
+        <div class="collapse-body" style="display:none">
+          <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+            <select id="camp-nonconv-filter" class="fsel" onchange="filterNonConverters()" style="font-size:10px;padding:4px 8px">
+              <option value="">All Status</option>
+              <option value="Read">Read</option>
+              <option value="Delivered">Delivered</option>
+            </select>
+            <button class="fbtn sec" style="font-size:10px;padding:4px 10px" onclick="exportCampaignNonConv()">⬇ Export</button>
+          </div>
+          <div class="tbl-wrap" id="camp-nonconv" style="max-height:250px;overflow-y:auto"></div>
+        </div>
+      </div>
+
+      <!-- Campaign Performance -->
+      <div class="card">
+        <div class="card-title">📊 All Campaigns Performance</div>
+        <div id="camp-perf-table"></div>
+      </div>
+
     </div>
   </div>
 
-  <div class="row">
-    <div class="card c2">
-      <div class="card-title">🍱 Items Ordered After Campaign</div>
-      <div class="bars" id="camp-post-items"></div>
-    </div>
-    <div class="card c1">
-      <div class="card-title">📊 Performance vs All Campaigns</div>
-      <div id="camp-perf-table"></div>
-    </div>
-  </div>
-
-  <div class="row">
-    <div class="card c2">
-      <div class="card-title">❌ Non-Converters (Delivered, No Order) <button class="fbtn sec" style="margin-left:auto;font-size:10px" onclick="exportCampaignNonConv()">⬇ Export</button></div>
-      <div class="tbl-wrap" id="camp-nonconv"></div>
-    </div>
-    <div class="card c1">
-      <div class="card-title">📲 Campaign Funnel Activity — WA</div>
-      <div class="tbl-wrap" id="camp-funnel-wa"></div>
-    </div>
-  </div>
-  <div class="row">
+  <!-- Funnel Activity (full width) -->
+  <div class="row" style="margin-top:12px">
     <div class="card c3">
       <div class="card-title">📱 Campaign Funnel Activity — App</div>
       <div class="tbl-wrap" id="camp-funnel-app"></div>
     </div>
   </div>
+  <div class="row">
+    <div class="card c3">
+      <div class="card-title">📲 Campaign Funnel Activity — WA</div>
+      <div class="tbl-wrap" id="camp-funnel-wa"></div>
+    </div>
+  </div>
+
+  <div class="note g" id="camp-conversion-note" style="margin-top:10px;display:none"></div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════
@@ -1021,6 +1226,41 @@ const fmtK = n => {
 const pct  = (a,b) => Number(b) ? (Number(a)/Number(b)*100).toFixed(1)+'%' : '—';
 const el   = id => document.getElementById(id);
 const html = (id,h) => { const e=el(id); if(e) e.innerHTML=h; };
+const normDate = v => {
+  if (!v) return '';
+  const s = String(v);
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (m) return m[1];
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  const y = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${mm}-${dd}`;
+};
+const dateIST = v => {
+  if (!v) return '';
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return normDate(v);
+  return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+};
+// Format timestamp to dd/mm/yyyy and hh:mm:ss separately
+const fmtDT = v => {
+  if (!v) return { date: '—', time: '—' };
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return { date: String(v), time: '' };
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const yy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mi = String(d.getMinutes()).padStart(2,'0');
+  const ss = String(d.getSeconds()).padStart(2,'0');
+  return { date: `${dd}/${mm}/${yy}`, time: `${hh}:${mi}:${ss}` };
+};
+const fmtDTStr = v => {
+  const {date,time} = fmtDT(v);
+  return time && time !== '—' ? `${date} ${time}` : date;
+};
 
 // ── LOADING STATE ──────────────────────────────────────────────────────────
 let _loading = 0;
@@ -1035,26 +1275,92 @@ async function api(path) {
   return j;
 }
 
-// ── FILTER PARAMS — multi-select support ──────────────────────────────────
+// ── CUSTOM MULTI-SELECT HELPERS ───────────────────────────────────────────
+function togglePanel(id) {
+  const panel = el(id + '-panel');
+  if (!panel) return;
+  const isOpen = panel.classList.contains('open');
+  // Close all other panels first
+  document.querySelectorAll('.ms-panel.open').forEach(p => p.classList.remove('open'));
+  if (!isOpen) panel.classList.add('open');
+}
+function closePanel(id) {
+  const panel = el(id + '-panel');
+  if (panel) panel.classList.remove('open');
+}
+function filterMSList(id) {
+  const panel = el(id + '-panel');
+  if (!panel) return;
+  const search = panel.querySelector('.ms-search input')?.value?.toLowerCase() || '';
+  const items = panel.querySelectorAll('.ms-item');
+  items.forEach(item => {
+    const text = item.textContent.toLowerCase();
+    item.style.display = text.includes(search) ? '' : 'none';
+  });
+}
+function updateMSLabel(id) {
+  const list = el(id + '-list');
+  const label = el(id + '-label');
+  if (!list || !label) return;
+  const checked = list.querySelectorAll('input[type="checkbox"]:checked');
+  const count = checked.length;
+  if (count === 0) {
+    label.innerHTML = id === 'ms-plat' ? 'All Platforms' : 'All Restaurants';
+  } else if (count <= 2) {
+    const names = Array.from(checked).map(cb => cb.closest('.ms-item').textContent.trim()).join(', ');
+    label.innerHTML = `<span class="ms-count">${count}</span> ${names.substring(0, 30)}${names.length > 30 ? '…' : ''}`;
+  } else {
+    label.innerHTML = `<span class="ms-count">${count}</span> ${count} selected`;
+  }
+  // Mark items as selected
+  list.querySelectorAll('.ms-item').forEach(item => {
+    const cb = item.querySelector('input[type="checkbox"]');
+    item.classList.toggle('selected', cb?.checked);
+  });
+}
+function clearMS(id) {
+  const list = el(id + '-list');
+  if (!list) return;
+  list.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+  updateMSLabel(id);
+}
+function selectAllMS(id) {
+  const list = el(id + '-list');
+  if (!list) return;
+  list.querySelectorAll('.ms-item').forEach(item => {
+    if (item.style.display !== 'none') {
+      const cb = item.querySelector('input[type="checkbox"]');
+      if (cb) cb.checked = true;
+    }
+  });
+  updateMSLabel(id);
+}
+function getSelectedValues(id) {
+  const list = el(id + '-list');
+  if (!list) return [];
+  return Array.from(list.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value).filter(Boolean);
+}
+// Close panels when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('.ms-wrap')) {
+    document.querySelectorAll('.ms-panel.open').forEach(p => p.classList.remove('open'));
+  }
+});
+
+// ── FILTER PARAMS — custom multi-select support ───────────────────────────
 function fp() {
   const p = new URLSearchParams();
   const from=el('f-from')?.value, to=el('f-to')?.value;
   if(from) p.set('from',from);
   if(to)   p.set('to',to);
 
-  // Multi-select platform — join selected options with comma
-  const platSel = el('f-plat');
-  if(platSel) {
-    const selected = Array.from(platSel.selectedOptions).map(o=>o.value).filter(Boolean);
-    if(selected.length) p.set('platform', selected.join(','));
-  }
+  // Custom multi-select platform
+  const platVals = getSelectedValues('ms-plat');
+  if(platVals.length) p.set('platform', platVals.join(','));
 
-  // Multi-select restaurant
-  const restSel = el('f-rest');
-  if(restSel) {
-    const selected = Array.from(restSel.selectedOptions).map(o=>o.value).filter(Boolean);
-    if(selected.length) p.set('shop_id', selected.join(','));
-  }
+  // Custom multi-select restaurant
+  const restVals = getSelectedValues('ms-rest');
+  if(restVals.length) p.set('shop_id', restVals.join(','));
 
   // Delivery type single select
   const dtype = el('f-dtype')?.value;
@@ -1106,7 +1412,7 @@ async function showDrillOrders(title, extra = {}) {
     const tableRows = rows.map(r => `
       <tr>
         <td class="mono">${r.order_id || '—'}</td>
-        <td>${r.order_date || '—'}</td>
+        <td>${normDate(r.order_date) || '—'}</td>
         <td>${r.customer_name || '—'}</td>
         <td class="mono">${r.customer_contact || '—'}</td>
         <td>${r.restaurant_name || '—'}</td>
@@ -1229,7 +1535,8 @@ function bindDailyBarClicks() {
     const day = (_modalData.daily || [])[i];
     if (!day) return;
     b.style.cursor = 'pointer';
-    b.addEventListener('click', () => showDrillOrders(`Orders — ${day.order_date}`, { order_date: day.order_date }));
+    const d = normDate(day.order_date);
+    b.addEventListener('click', () => showDrillOrders(`Orders — ${d}`, { order_date: d }));
   });
 }
 
@@ -1240,14 +1547,17 @@ async function initFilters() {
     if(d.min_date) el('f-from').value = d.min_date;
     if(d.max_date) el('f-to').value   = d.max_date;
 
-    // Populate restaurant multi-select (clear first)
-    const rs = el('f-rest');
-    while(rs.options.length) rs.remove(0);
-    (d.restaurants||[]).forEach(r=>{
-      const o=document.createElement('option');
-      o.value=r.shop_id; o.textContent=r.restaurant_name||r.shop_id;
-      rs.appendChild(o);
-    });
+    // Populate custom restaurant multi-select
+    const restList = el('ms-rest-list');
+    if(restList) {
+      restList.innerHTML = '';
+      (d.restaurants||[]).forEach(r=>{
+        const lbl = document.createElement('label');
+        lbl.className = 'ms-item';
+        lbl.innerHTML = `<input type="checkbox" value="${r.shop_id}" onchange="updateMSLabel('ms-rest')"/> ${r.restaurant_name||r.shop_id}`;
+        restList.appendChild(lbl);
+      });
+    }
 
     // Delivery type filter
     const dt = el('f-dtype');
@@ -1269,7 +1579,7 @@ async function initFilters() {
       (d.campaigns||[]).forEach(c=>{
         const o=document.createElement('option');
         o.value=c.campaign_name;
-        o.textContent=`${c.campaign_name} — ${c.scheduled_date||'?'} (${fmt(c.recipient_count)} recipients)`;
+        o.textContent=`${c.campaign_name} — ${normDate(c.scheduled_date)||'?'} (${fmt(c.recipient_count)} recipients)`;
         cs.appendChild(o);
       });
     }
@@ -1277,15 +1587,19 @@ async function initFilters() {
     // Set date pickers on other tabs
     ['camp-from','geo-from'].forEach(id=>{ if(el(id)&&d.min_date) el(id).value=d.min_date; });
     ['camp-to','geo-to'].forEach(id=>{   if(el(id)&&d.max_date)   el(id).value=d.max_date; });
+    
+    // Update multi-select labels
+    updateMSLabel('ms-plat');
+    updateMSLabel('ms-rest');
   } catch(e) { console.warn('Filter init failed',e); }
 }
 
 function resetFilters() {
-  // Deselect all options in multi-selects
-  const ps=el('f-plat'); if(ps) Array.from(ps.options).forEach(o=>o.selected=false);
-  const rs=el('f-rest'); if(rs) Array.from(rs.options).forEach(o=>o.selected=false);
+  // Clear custom multi-selects
+  clearMS('ms-plat');
+  clearMS('ms-rest');
   const dt=el('f-dtype'); if(dt) dt.value='';
-  initFilters().then(()=>applyFilters());
+  initFilters().then(()=> applyFilters());
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1355,11 +1669,12 @@ function renderDoDChart(daily, svgId, W=800, H=110) {
     const bh=Math.max(((d.orders/maxO)*(H-pT-pB)).toFixed(0),1);
     const x=pL+i*bw;
     const isMax=d.orders===maxO;
-    return `<rect x="${x.toFixed(1)}" y="${H-pB-bh}" width="${Math.max(bw-0.5,0.3).toFixed(1)}" height="${bh}" fill="${isMax?'var(--green)':'var(--blue)'}" rx="0.5" opacity=".75">
-      <title>${d.order_date} (${d.dow||''}) — ${fmt(d.orders)} orders · ${fmtK(d.gmv)}</title></rect>`;
+    const dateKey = normDate(d.order_date);
+    return `<rect x="${x.toFixed(1)}" y="${H-pB-bh}" width="${Math.max(bw-0.5,0.3).toFixed(1)}" height="${bh}" fill="${isMax?'var(--green)':'var(--blue)'}" rx="0.5" opacity=".75" style="cursor:pointer" onclick="showDrillOrders('Orders — ${dateKey}',{order_date:'${dateKey}'})">
+      <title>${dateKey} (${d.dow||''}) — ${fmt(d.orders)} orders · ${fmtK(d.gmv)}</title></rect>`;
   }).join('');
   const months={};
-  daily.forEach((d,i)=>{ const m=String(d.order_date).substr(0,7); if(!months[m]) months[m]=i; });
+  daily.forEach((d,i)=>{ const m=normDate(d.order_date).substr(0,7); if(!months[m]) months[m]=i; });
   const xlbl=Object.entries(months).map(([m,i])=>{
     const x=pL+i*bw;
     return `<text x="${x.toFixed(0)}" y="${H-pB+14}" fill="var(--t3)" font-size="8">${m}</text>`;
@@ -1475,9 +1790,14 @@ function renderHourChart(hourly, svgId, W=640, H=70) {
 }
 
 function renderWAHourChart(hourly, svgId, W=640, H=80) {
-  const svgEl=el(svgId); if(!svgEl||!hourly.length) return;
+  const svgEl=el(svgId); if(!svgEl) return;
+  if(!hourly.length){
+    svgEl.setAttribute('viewBox',`0 0 ${W} ${H}`);
+    svgEl.innerHTML = `<text x="${Math.round(W/2)}" y="${Math.round(H/2)}" text-anchor="middle" fill="var(--t3)" font-size="11">No hourly WA data</text>`;
+    return;
+  }
   const byHour={};
-  hourly.forEach(h=>{ if(!byHour[h.event_hour]) byHour[h.event_hour]=0; byHour[h.event_hour]+=h.total; });
+  hourly.forEach(h=>{ if(!byHour[h.event_hour]) byHour[h.event_hour]=0; byHour[h.event_hour]+=Number(h.total)||0; });
   const max=Math.max(...Object.values(byHour),1);
   const pL=28,pR=8, bw=(W-pL-pR)/24;
   const bars=Object.entries(byHour).map(([hr,cnt])=>{
@@ -1622,7 +1942,7 @@ function renderTrendItems(d){
   const maxD = Math.max(...dayRows.map(r=>Number(r.qty)||0),1);
   html('tr-item-day', dayRows.map((r,i)=>`
     <div class="brow">
-      <div class="blbl w200">${r.order_date} · ${r.product_name}</div>
+      <div class="blbl w200">${normDate(r.order_date)} · ${r.product_name}</div>
       <div class="btrack"><div class="bfill ${['gr0','gr1','gr2','gr3','gr4','gr5'][i%6]}" style="width:${(r.qty/maxD*100).toFixed(0)}%;cursor:pointer" onclick="showDrillOrders('Item Orders — ${String(r.product_name||'').replace(/'/g,"\\'")}',{product_name:'${String(r.product_name||'').replace(/'/g,"\\'")}'} )">
         <span>${fmt(r.qty)}</span>
       </div></div>
@@ -1880,6 +2200,8 @@ async function loadFunnelWA() {
 }
 
 // ── CAMPAIGNS ─────────────────────────────────────────────────────────────────
+let _campData = {}; // Store campaign data for filtering
+
 async function loadCampaigns() {
   startLoad();
   try {
@@ -1890,89 +2212,320 @@ async function loadCampaigns() {
     if(from)     p.set('from',from);
     if(to)       p.set('to',to);
     const d=await api('campaigns?'+p);
+    _campData = d; // Store for filtering
     const s=d.summary||{};
 
-    // Delivery steps visual
+    // Compact delivery summary (horizontal)
     html('camp-delivery-steps',`
-      <div class="d-step"><div class="d-num" style="color:var(--t1)">${fmt(s.total_recipients)}</div><div class="d-lbl">Recipients</div></div>
-      <div class="d-step"><div class="d-num" style="color:var(--blue)">${fmt(s.sent)}</div><div class="d-lbl">Sent</div><div class="d-pct" style="color:var(--blue)">${s.sent_rate}%</div></div>
-      <div class="d-step"><div class="d-num" style="color:var(--green)">${fmt(s.delivered)}</div><div class="d-lbl">Delivered</div><div class="d-pct" style="color:var(--green)">${s.delivered_rate}%</div></div>
-      <div class="d-step"><div class="d-num" style="color:var(--orange)">${fmt(s.read_count)}</div><div class="d-lbl">Read</div><div class="d-pct" style="color:var(--orange)">${s.read_rate}%</div></div>`);
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:22px;font-weight:800;color:var(--t1)">${fmt(s.total_recipients)}</span>
+        <span style="font-size:10px;color:var(--t3)">Recipients</span>
+      </div>
+      <div style="color:var(--t3)">→</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:22px;font-weight:800;color:var(--blue)">${fmt(s.sent)}</span>
+        <span style="font-size:10px;color:var(--t3)">Sent (${s.sent_rate}%)</span>
+      </div>
+      <div style="color:var(--t3)">→</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:22px;font-weight:800;color:var(--green)">${fmt(s.delivered)}</span>
+        <span style="font-size:10px;color:var(--t3)">Delivered (${s.delivered_rate}%)</span>
+      </div>
+      <div style="color:var(--t3)">→</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:22px;font-weight:800;color:var(--orange)">${fmt(s.read_count)}</span>
+        <span style="font-size:10px;color:var(--t3)">Read (${s.read_rate}%)</span>
+      </div>`);
 
-    // KPIs
-    const perf=(d.perf||[])[0]||{};
-    html('camp-kpis',`
-      <div class="kpi blue"><div class="kl">Recipients</div><div class="kv">${fmt(s.total_recipients)}</div></div>
-      <div class="kpi green"><div class="kl">Delivered</div><div class="kv">${fmt(s.delivered)}</div><div class="ks">${s.delivered_rate}% rate</div></div>
-      <div class="kpi orange"><div class="kl">Read</div><div class="kv">${fmt(s.read_count)}</div><div class="ks">${s.read_rate}% rate</div></div>
-      <div class="kpi purple"><div class="kl">Post-Campaign Orders</div><div class="kv">${fmt((d.postOrders||[]).length)}</div></div>
-      <div class="kpi teal"><div class="kl">Conversion</div><div class="kv">${perf.conversion_rate_pct||'—'}%</div><div class="ks">Read → Order (24h)</div></div>`);
+    // Calculate order counts
+    const postAll = d.postOrders || [];
+    const afterRowsData = postAll.filter(r => String(r.order_timing||'').toLowerCase().includes('after'));
+    const beforeRowsData = postAll.filter(r => String(r.order_timing||'').toLowerCase().includes('before'));
+    const afterUsersCount = new Set(afterRowsData.map(r=>r.mobile_number).filter(Boolean)).size;
+    const beforeUsersCount = new Set(beforeRowsData.map(r=>r.mobile_number).filter(Boolean)).size;
+    const ncCount = (d.nonConverters||[]).length;
 
-    // Recipients table
-    const rrows=(d.recipients||[]).slice(0,100).map(r=>`
-      <tr>
+    // Update quick filter button counts
+    el('qb-all').textContent = fmt(s.total_recipients || 0);
+    el('qb-delivered').textContent = fmt(s.delivered || 0);
+    el('qb-read').textContent = fmt(s.read_count || 0);
+    el('qb-post').textContent = fmt(afterRowsData.length);
+    el('qb-nonconv').textContent = fmt(ncCount);
+
+    // Store data for filtering
+    window._campRecipients = d.recipients || [];
+    window._campNonConverters = d.nonConverters || [];
+    window._campAfterOrders = afterRowsData;
+    window._campBeforeOrders = beforeRowsData;
+    window._campItemsDetail = d.postItems || [];
+
+    // Reset filters
+    if(el('camp-status-filter')) el('camp-status-filter').value = '';
+    if(el('camp-nonconv-filter')) el('camp-nonconv-filter').value = '';
+    
+    // Render recipients
+    filterCampRecipients();
+
+    // Render AFTER orders (primary, always visible)
+    const rowHtml = (rows, limit=100) => rows.slice(0, limit).map(r => {
+      const dt = fmtDT(r.order_ts || r.order_date);
+      return `<tr>
+        <td class="mono" style="font-size:10px">${r.order_id||'—'}</td>
         <td class="mono">${r.mobile_number||'—'}</td>
-        <td><span class="pill ${r.delivery_status==='Read'?'pg':r.delivery_status==='Delivered'?'pb':r.delivery_status==='Sent'?'po':'pr'}">${r.delivery_status}</span></td>
-        <td>${r.scheduled_date||'—'}</td>
-        <td><span class="pill ${SCOL[r.segment]?'pp':'pb'}">${r.segment}</span></td>
-        <td class="num">${fmt(r.lifetime_orders)}</td>
-        <td class="num">${fmtK(r.lifetime_gmv)}</td>
-        <td style="font-size:10px;color:var(--t3)">${r.last_order_date||'—'}</td>
-      </tr>`).join('');
-    html('camp-recipients',`<table><thead><tr><th>Mobile</th><th>Status</th><th>Sent</th><th>Segment</th><th>Lifetime Ord</th><th>Lifetime GMV</th><th>Last Order</th></tr></thead><tbody>${rrows||'<tr><td colspan="7" class="loading">No recipients</td></tr>'}</tbody></table>`);
+        <td>${r.customer_name||'—'}</td>
+        <td class="num hi">${fmtR(r.order_value)}</td>
+        <td style="white-space:nowrap">${dt.date}<br><span style="font-size:9px;color:var(--t3)">${dt.time}</span></td>
+        <td>${r.restaurant_name||'—'}</td>
+        <td>${PLAT[r.platform]||r.platform||'—'}</td>
+        <td>${r.delivery_type||'—'}</td>
+      </tr>`;
+    }).join('');
 
-    // Post-campaign orders
-    const prows=(d.postOrders||[]).slice(0,50).map(r=>`
-      <tr><td class="mono">${r.order_id||'—'}</td>
-          <td class="mono">${r.mobile_number||'—'}</td>
-          <td>${r.order_timing||'—'}</td>
-          <td class="num hi">${fmtR(r.order_value)}</td>
-          <td>${r.order_date||'—'}</td>
-          <td>${r.restaurant_name||'—'}</td>
-          <td>${PLAT[r.platform]||r.platform||'—'}</td>
-          <td>${r.delivery_type||'—'}</td></tr>`).join('');
-    html('camp-post-orders',`<table><thead><tr><th>Order ID</th><th>Mobile</th><th>Timing</th><th>Value</th><th>Date</th><th>Restaurant</th><th>Platform</th><th>Delivery</th></tr></thead><tbody>${prows||'<tr><td colspan="8" class="loading">No post-campaign orders yet</td></tr>'}</tbody></table>`);
+    html('camp-after-orders', `
+      <div style="font-size:11px;color:var(--green);font-weight:700;margin-bottom:8px">
+        ${fmt(afterRowsData.length)} orders • ${fmt(afterUsersCount)} unique users • 
+        Revenue: ${fmtK(afterRowsData.reduce((s,r)=>s+Number(r.order_value||0),0))}
+      </div>
+      <table><thead><tr><th>Order ID</th><th>Mobile</th><th>Name</th><th>Value</th><th>Date/Time</th><th>Restaurant</th><th>Platform</th><th>Delivery</th></tr></thead>
+      <tbody>${rowHtml(afterRowsData) || '<tr><td colspan="8" class="loading">No orders after campaign</td></tr>'}</tbody></table>`);
 
-    if((d.postOrders||[]).length>0) {
-      el('camp-conversion-note').style.display='block';
-      html('camp-conversion-note','<strong>✅ Post-Campaign Orders Found</strong>'+
-        `${(d.postOrders||[]).length} orders placed by campaign recipients after delivery. ` +
-        `Revenue: ${fmtK((d.postOrders||[]).reduce((s,r)=>s+Number(r.order_value||0),0))}`);
+    // Render BEFORE orders (collapsible)
+    html('camp-before-orders', `
+      <div style="font-size:11px;color:var(--t3);margin-bottom:8px">
+        ${fmt(beforeRowsData.length)} orders • ${fmt(beforeUsersCount)} unique users
+      </div>
+      <table><thead><tr><th>Order ID</th><th>Mobile</th><th>Name</th><th>Value</th><th>Date/Time</th><th>Restaurant</th><th>Platform</th><th>Delivery</th></tr></thead>
+      <tbody>${rowHtml(beforeRowsData) || '<tr><td colspan="8" class="loading">No orders before campaign</td></tr>'}</tbody></table>`);
+    // Update collapse header with count
+    const beforeCard = el('camp-before-card');
+    if (beforeCard) {
+      const hdr = beforeCard.querySelector('.collapse-hdr span');
+      if (hdr) hdr.textContent = `📜 Before Campaign (${fmt(beforeRowsData.length)} orders • ${fmt(beforeUsersCount)} users)`;
     }
 
-    // Post items
-    const maxI=Math.max(...(d.postItems||[]).map(i=>i.qty),1);
-    html('camp-post-items', (d.postItems||[]).map((it,i)=>`
-      <div class="brow"><div class="blbl">${it.product_name}</div>
-      <div class="btrack"><div class="bfill ${['gr0','gr1','gr2','gr3','gr4'][i%5]}" style="width:${(it.qty/maxI*100).toFixed(0)}%">
-        <span>${fmt(it.qty)} orders</span></div></div></div>`).join('') || '<div class="loading">No item data</div>');
+    // Post items — clickable bars
+    const itemsAgg = d.postItemsSummary || [];
+    const maxI = Math.max(...itemsAgg.map(i=>i.qty), 1);
+    html('camp-post-items', itemsAgg.length ? itemsAgg.map((it,i)=>`
+      <div class="brow" style="cursor:pointer" onclick="showItemCustomers('${it.product_name.replace(/'/g,"\\'")}')">
+        <div class="blbl">${it.product_name}</div>
+        <div class="btrack"><div class="bfill ${['gr0','gr1','gr2','gr3','gr4'][i%5]}" style="width:${(it.qty/maxI*100).toFixed(0)}%">
+          <span>${fmt(it.qty)}</span></div></div>
+      </div>`).join('') : '<div class="empty" style="padding:20px;text-align:center;color:var(--t3)">No items ordered after campaign</div>');
 
-    // All campaigns performance
-    const cperf=(d.perf||[]).map(c=>`
-      <div class="cmp-card">
-        <div class="cmp-name">📣 ${c.campaign_name} <span style="font-size:10px;color:var(--t3);font-weight:400">${c.scheduled_date||''}</span></div>
-        <div class="cmp-stats">
-          <div class="cmp-stat"><div class="d-num" style="color:var(--t1)">${fmt(c.total_recipients)}</div><div class="d-lbl">Recipients</div></div>
-          <div class="cmp-stat"><div class="d-num" style="color:var(--blue)">${c.sent_rate_pct||0}%</div><div class="d-lbl">Sent</div></div>
-          <div class="cmp-stat"><div class="d-num" style="color:var(--green)">${c.delivered_rate_pct||0}%</div><div class="d-lbl">Delivered</div></div>
-          <div class="cmp-stat"><div class="d-num" style="color:var(--orange)">${c.read_rate_pct||0}%</div><div class="d-lbl">Read</div></div>
-          <div class="cmp-stat"><div class="d-num" style="color:var(--purple)">${c.orders_after_24h||0}</div><div class="d-lbl">Orders (24h)</div></div>
-          <div class="cmp-stat"><div class="d-num" style="color:var(--teal)">${c.conversion_rate_pct||0}%</div><div class="d-lbl">Conv%</div></div>
+    // Non-converters (collapsible)
+    filterNonConverters();
+    // Update collapse header
+    const ncCard = el('camp-nonconv-card');
+    if (ncCard) {
+      const hdr = ncCard.querySelector('.collapse-hdr span');
+      if (hdr) hdr.textContent = `❌ Non-Converters (${fmt(ncCount)} contacts)`;
+    }
+
+    // All campaigns performance (compact)
+    const cperf = (d.perf||[]).map(c=>`
+      <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--bdr)">
+        <div style="flex:1;font-size:11px;font-weight:600">${c.campaign_name}</div>
+        <div style="font-size:10px;color:var(--t3)">${fmtDT(c.scheduled_date).date}</div>
+        <div style="display:flex;gap:8px;font-size:10px">
+          <span title="Recipients">${fmt(c.total_recipients)}</span>
+          <span style="color:var(--green)" title="Delivered">${c.delivered_rate_pct||0}%</span>
+          <span style="color:var(--orange)" title="Read">${c.read_rate_pct||0}%</span>
+          <span style="color:var(--purple)" title="Orders 24h">${c.orders_after_24h||0}</span>
         </div>
-        <div class="prog-bar" style="margin-top:10px"><div class="prog-fill" style="width:${c.delivered_rate_pct||0}%;background:var(--green)"></div></div>
       </div>`).join('');
-    html('camp-perf-table', cperf||'<div class="loading">No campaign performance data in agg_campaign_performance</div>');
+    html('camp-perf-table', cperf || '<div class="empty" style="padding:20px;text-align:center;color:var(--t3)">No campaign data</div>');
 
-    const ncRows=(d.nonConverters||[]).slice(0,200).map(r=>`
-      <tr><td class="mono">${r.mobile_number||'—'}</td><td>${r.campaign_date||'—'}</td><td>${r.delivery_status||'—'}</td><td>${r.segment||'—'}</td><td class="num">${fmt(r.lifetime_orders)}</td><td>${r.last_order_date||'—'}</td></tr>`).join('');
-    html('camp-nonconv', `<table><thead><tr><th>Mobile</th><th>Campaign Date</th><th>Status</th><th>Segment</th><th>Lifetime Orders</th><th>Last Order</th></tr></thead><tbody>${ncRows||'<tr><td colspan="6" class="loading">No non-converters</td></tr>'}</tbody></table>`);
+    // Funnel visualization
+    const buildFunnelJourney = (events, title) => {
+      if (!events || !events.length) return `<div class="empty" style="padding:30px;text-align:center"><div style="font-size:24px;margin-bottom:8px">📊</div><p style="color:var(--t3)">No ${title} funnel activity</p></div>`;
+      const byCustomer = {};
+      events.forEach(e => {
+        const key = e.customer_contact;
+        if (!byCustomer[key]) byCustomer[key] = { contact: key, name: e.customer_name, ordered: e.did_order, steps: [], actionCounts: {} };
+        byCustomer[key].steps.push(e);
+        if (e.did_order) byCustomer[key].ordered = true;
+        const action = (e.action || '').toUpperCase();
+        byCustomer[key].actionCounts[action] = (byCustomer[key].actionCounts[action] || 0) + 1;
+      });
+      const customers = Object.values(byCustomer);
+      const uniqueCount = customers.length;
+      const orderedCount = customers.filter(c => c.ordered).length;
+      
+      let h = `<div style="font-size:11px;margin-bottom:10px">
+        <span style="color:var(--blue);font-weight:700">${fmt(uniqueCount)}</span> contacts • 
+        <span style="color:var(--green);font-weight:700">${fmt(orderedCount)}</span> ordered • 
+        <span style="color:var(--orange);font-weight:700">${fmt(uniqueCount - orderedCount)}</span> no order
+      </div><div class="funnel-scroll">`;
+      
+      customers.forEach(c => {
+        const ordClass = c.ordered ? 'ordered' : 'no-order';
+        const badge = c.ordered ? '<span class="funnel-badge yes">✓ Ordered</span>' : '<span class="funnel-badge no">✗ No Order</span>';
+        const counts = c.actionCounts;
+        const countBadges = [];
+        if (counts['PLP']) countBadges.push(`<span style="background:var(--blue);color:#fff;padding:2px 6px;border-radius:4px;font-size:9px">PLP:${counts['PLP']}</span>`);
+        if (counts['VIEW_CART']) countBadges.push(`<span style="background:var(--orange);color:#fff;padding:2px 6px;border-radius:4px;font-size:9px">Cart:${counts['VIEW_CART']}</span>`);
+        if (counts['CHECKOUT']) countBadges.push(`<span style="background:var(--purple);color:#fff;padding:2px 6px;border-radius:4px;font-size:9px">Checkout:${counts['CHECKOUT']}</span>`);
+        if (counts['ORDER'] || counts['ORDER_PLACED']) countBadges.push(`<span style="background:var(--green);color:#fff;padding:2px 6px;border-radius:4px;font-size:9px">Order:${(counts['ORDER']||0)+(counts['ORDER_PLACED']||0)}</span>`);
+        
+        h += `<div class="funnel-user ${ordClass}">
+          <div class="funnel-hdr">
+            <span class="funnel-contact">${c.contact}</span>
+            <span class="funnel-name">${c.name || ''}</span>
+            ${badge}
+            <div style="display:flex;gap:4px;margin-left:auto">${countBadges.join('')}</div>
+          </div>
+          <div class="funnel-steps">`;
+        c.steps.forEach((s, i) => {
+          const dt = fmtDT(s.timestamp);
+          const actionClass = (s.action||'').toLowerCase().replace(/[^a-z_]/g,'');
+          if (i > 0) h += '<span class="funnel-arrow">→</span>';
+          h += `<div class="funnel-step ${actionClass}">
+            <strong>${s.action}</strong>
+            <span class="step-rest" title="${s.restaurant_name||''}">${(s.restaurant_name||'').substring(0,12)}</span>
+            <span class="step-time">${dt.time}</span>
+          </div>`;
+        });
+        h += `</div></div>`;
+      });
+      h += '</div>';
+      return h;
+    };
 
-    const waRows=(d.waFunnelActivity||[]).slice(0,100).map(r=>`<tr><td class="mono">${r.customer_contact||'—'}</td><td>${r.action||'—'}</td><td>${r.restaurant_name||'—'}</td><td class="num">${fmt(r.event_count)}</td><td>${r.last_activity||'—'}</td></tr>`).join('');
-    html('camp-funnel-wa', `<table><thead><tr><th>Contact</th><th>Action</th><th>Restaurant</th><th>Events</th><th>Last</th></tr></thead><tbody>${waRows||'<tr><td colspan="5" class="loading">No WA funnel activity</td></tr>'}</tbody></table>`);
+    html('camp-funnel-app', buildFunnelJourney(d.appFunnelActivity, 'App'));
+    html('camp-funnel-wa', buildFunnelJourney(d.waFunnelActivity, 'WhatsApp'));
 
-    const appRows=(d.appFunnelActivity||[]).slice(0,150).map(r=>`<tr><td class="mono">${r.customer_contact||'—'}</td><td>${r.action||'—'}</td><td>${r.restaurant_name||'—'}</td><td class="num">${fmt(r.event_count)}</td><td>${r.last_activity||'—'}</td></tr>`).join('');
-    html('camp-funnel-app', `<table><thead><tr><th>Contact</th><th>Action</th><th>Restaurant</th><th>Events</th><th>Last</th></tr></thead><tbody>${appRows||'<tr><td colspan="5" class="loading">No App funnel activity</td></tr>'}</tbody></table>`);
+    if(afterRowsData.length > 0) {
+      el('camp-conversion-note').style.display = 'block';
+      html('camp-conversion-note', `<strong>✅ Post-Campaign: </strong>${afterRowsData.length} orders by ${afterUsersCount} users. Revenue: ${fmtK(afterRowsData.reduce((s,r)=>s+Number(r.order_value||0),0))}`);
+    } else {
+      el('camp-conversion-note').style.display = 'none';
+    }
+
   } catch(e){ console.error(e); } finally { endLoad(); }
+}
+
+// Toggle collapsible sections
+function toggleCollapse(cardId) {
+  const card = el(cardId);
+  if (!card) return;
+  const body = card.querySelector('.collapse-body');
+  const isOpen = card.classList.contains('open');
+  if (isOpen) {
+    card.classList.remove('open');
+    body.style.display = 'none';
+  } else {
+    card.classList.add('open');
+    body.style.display = 'block';
+  }
+}
+
+// Quick filter buttons
+function quickFilterCamp(filter) {
+  // Update button states
+  document.querySelectorAll('.camp-qbtn').forEach(btn => btn.classList.remove('active'));
+  document.querySelector(`.camp-qbtn[data-filter="${filter}"]`)?.classList.add('active');
+  
+  // Apply filter
+  if (filter === 'all') {
+    el('camp-status-filter').value = '';
+    filterCampRecipients();
+  } else if (filter === 'Delivered' || filter === 'Read') {
+    el('camp-status-filter').value = filter;
+    filterCampRecipients();
+  } else if (filter === 'post') {
+    // Show only recipients who ordered after campaign
+    const afterContacts = new Set((window._campAfterOrders || []).map(o => o.mobile_number));
+    const filtered = (window._campRecipients || []).filter(r => afterContacts.has(r.mobile_number));
+    renderRecipients(filtered, `Post-Campaign Orderers (${filtered.length})`);
+  } else if (filter === 'nonconv') {
+    // Show non-converters in recipients table
+    const nc = window._campNonConverters || [];
+    const ncContacts = new Set(nc.map(r => r.mobile_number));
+    const filtered = (window._campRecipients || []).filter(r => ncContacts.has(r.mobile_number));
+    renderRecipients(filtered, `Non-Converters (${filtered.length})`);
+  }
+}
+
+// Render recipients table
+function renderRecipients(data, label) {
+  const rows = data.slice(0, 150).map(r => {
+    const dt = fmtDT(r.scheduled_date);
+    return `<tr>
+      <td class="mono">${r.mobile_number||'—'}</td>
+      <td><span class="pill ${r.delivery_status==='Read'?'pg':r.delivery_status==='Delivered'?'pb':r.delivery_status==='Sent'?'po':'pr'}">${r.delivery_status}</span></td>
+      <td>${dt.date}</td>
+      <td class="num">${fmt(r.lifetime_orders)}</td>
+      <td class="num">${fmtK(r.lifetime_gmv)}</td>
+    </tr>`;
+  }).join('');
+  
+  html('camp-recipients', `
+    <div style="font-size:10px;color:var(--t3);margin-bottom:6px">${label || `${fmt(data.length)} recipients`}</div>
+    <table><thead><tr><th>Mobile</th><th>Status</th><th>Sent</th><th>Orders</th><th>GMV</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="5" class="loading">No data</td></tr>'}</tbody></table>`);
+}
+
+// Filter recipients by status
+function filterCampRecipients() {
+  const status = el('camp-status-filter')?.value || '';
+  const all = window._campRecipients || [];
+  const filtered = status ? all.filter(r => r.delivery_status === status) : all;
+  renderRecipients(filtered, status ? `${status} (${filtered.length})` : `${filtered.length} recipients`);
+}
+
+// Filter non-converters
+function filterNonConverters() {
+  const status = el('camp-nonconv-filter')?.value || '';
+  const all = window._campNonConverters || [];
+  const filtered = status ? all.filter(r => r.delivery_status === status) : all;
+  
+  const rows = filtered.slice(0, 150).map(r => {
+    const dt = fmtDT(r.campaign_date);
+    return `<tr>
+      <td class="mono">${r.mobile_number||'—'}</td>
+      <td>${dt.date}</td>
+      <td><span class="pill ${r.delivery_status==='Read'?'pg':'pb'}">${r.delivery_status}</span></td>
+      <td>${r.segment||'—'}</td>
+    </tr>`;
+  }).join('');
+  
+  html('camp-nonconv', `
+    <div style="font-size:10px;color:var(--t3);margin-bottom:6px">${fmt(filtered.length)} non-converters${status ? ` (${status})` : ''}</div>
+    <table><thead><tr><th>Mobile</th><th>Campaign Date</th><th>Status</th><th>Segment</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="4" class="loading">No data</td></tr>'}</tbody></table>`);
+}
+
+// Show customers who ordered a specific item (from campaign items)
+function showItemCustomers(itemName) {
+  const items = window._campItemsDetail || [];
+  const filtered = items.filter(i => i.product_name === itemName);
+  if (!filtered.length) return;
+  
+  el('modal-title').textContent = `🍱 Customers who ordered: ${itemName}`;
+  el('modal-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  
+  const rows = filtered.map(r => {
+    const dt = fmtDT(r.order_ts);
+    return `<tr>
+      <td class="mono" style="font-size:10px">${r.order_id||'—'}</td>
+      <td class="mono">${r.mobile_number||'—'}</td>
+      <td>${r.customer_name||'—'}</td>
+      <td>${r.restaurant_name||'—'}</td>
+      <td class="num hi">${fmtR(r.order_value)}</td>
+      <td>${dt.date}<br><span style="font-size:9px;color:var(--t3)">${dt.time}</span></td>
+      <td>${PLAT[r.platform]||r.platform||'—'}</td>
+      <td>${r.delivery_type||'—'}</td>
+    </tr>`;
+  }).join('');
+  
+  el('modal-body').innerHTML = `
+    <div style="font-size:11px;color:var(--t2);margin-bottom:10px">${fmt(filtered.length)} order(s) for this item</div>
+    <table>
+      <thead><tr><th>Order ID</th><th>Mobile</th><th>Name</th><th>Restaurant</th><th>Value</th><th>Date/Time</th><th>Platform</th><th>Delivery</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
 }
 
 function exportCampaignNonConv() {
@@ -2517,6 +3070,11 @@ document.querySelectorAll('.tab').forEach(tab=>{
       el('err-text').textContent=e.message;
     });
   });
+});
+
+['f-plat','f-rest'].forEach(id=>{
+  const x = el(id);
+  if (x) x.addEventListener('change', refreshFilterMeta);
 });
 
 async function applyFilters() {

@@ -550,24 +550,6 @@ td.bad{color:var(--red)}
       <div class="tbl-wrap" id="uniq-table"></div>
     </div>
   </div>
-
-  <div class="sec-h">🍱 Item Trends</div>
-  <div class="row">
-    <div class="card c2">
-      <div class="card-title">Top Items by Day (click item for orders)</div>
-      <div class="bars" id="tr-item-day"></div>
-    </div>
-    <div class="card c1">
-      <div class="card-title">Top Items by Hour</div>
-      <div class="bars" id="tr-item-hour"></div>
-    </div>
-  </div>
-  <div class="row">
-    <div class="card c3">
-      <div class="card-title">Best Restaurant per Item (Daily+Monthly)</div>
-      <div class="tbl-wrap" id="tr-item-rest"></div>
-    </div>
-  </div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════
@@ -620,26 +602,6 @@ td.bad{color:var(--red)}
       <div class="note b" id="fn-rates" style="margin-top:10px"></div>
     </div>
   </div>
-  <div class="row">
-    <div class="card c2">
-      <div class="card-title">📅 Weekly Inflow Trend</div>
-      <div class="tbl-wrap" id="fn-weekly"></div>
-    </div>
-    <div class="card c1">
-      <div class="card-title">⏰ Most Active Hours</div>
-      <div class="bars" id="fn-hourly"></div>
-    </div>
-  </div>
-  <div class="row">
-    <div class="card c2">
-      <div class="card-title">🏪 Top 10 Restaurants by Funnel Activity</div>
-      <div class="tbl-wrap" id="fn-top-shops"></div>
-    </div>
-    <div class="card c1">
-      <div class="card-title">🚨 Drop-off Users (Actionable)</div>
-      <div class="tbl-wrap" id="fn-drop-users"></div>
-    </div>
-  </div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════
@@ -665,16 +627,6 @@ td.bad{color:var(--red)}
     <div class="card c1">
       <div class="card-title">📣 By Campaign</div>
       <div class="tbl-wrap" id="wa-fn-camp"></div>
-    </div>
-  </div>
-  <div class="row">
-    <div class="card c2">
-      <div class="card-title">📅 Weekly Inflow Trend</div>
-      <div class="tbl-wrap" id="wa-weekly"></div>
-    </div>
-    <div class="card c1">
-      <div class="card-title">🚨 Drop-off Users (WA)</div>
-      <div class="tbl-wrap" id="wa-drop-users"></div>
     </div>
   </div>
 </div>
@@ -734,23 +686,6 @@ td.bad{color:var(--red)}
     <div class="card c1">
       <div class="card-title">📊 Performance vs All Campaigns</div>
       <div id="camp-perf-table"></div>
-    </div>
-  </div>
-
-  <div class="row">
-    <div class="card c2">
-      <div class="card-title">❌ Non-Converters (Delivered, No Order) <button class="fbtn sec" style="margin-left:auto;font-size:10px" onclick="exportCampaignNonConv()">⬇ Export</button></div>
-      <div class="tbl-wrap" id="camp-nonconv"></div>
-    </div>
-    <div class="card c1">
-      <div class="card-title">📲 Campaign Funnel Activity — WA</div>
-      <div class="tbl-wrap" id="camp-funnel-wa"></div>
-    </div>
-  </div>
-  <div class="row">
-    <div class="card c3">
-      <div class="card-title">📱 Campaign Funnel Activity — App</div>
-      <div class="tbl-wrap" id="camp-funnel-app"></div>
     </div>
   </div>
 </div>
@@ -855,10 +790,6 @@ td.bad{color:var(--red)}
       <input type="number" id="geo-min" class="finp fsel" value="0" min="0" step="0.5" style="width:90px"/></div>
     <div><div style="font-size:10px;color:var(--t3);text-transform:uppercase;margin-bottom:5px">Max Distance (km)</div>
       <input type="number" id="geo-max" class="finp fsel" value="10" min="0" step="0.5" style="width:90px"/></div>
-    <div><div style="font-size:10px;color:var(--t3);text-transform:uppercase;margin-bottom:5px">Pickup Threshold (km)</div>
-      <input type="number" id="geo-thresh" class="finp fsel" value="2" min="0.5" step="0.5" style="width:110px"/></div>
-    <div><div style="font-size:10px;color:var(--t3);text-transform:uppercase;margin-bottom:5px">Min Lifetime Orders</div>
-      <input type="number" id="geo-min-orders" class="finp fsel" value="1" min="1" step="1" style="width:110px"/></div>
     <button class="fbtn" onclick="loadGeo()">▶ Apply</button>
     <button class="fbtn sec" onclick="exportGeo()">⬇ Export</button>
   </div>
@@ -875,12 +806,6 @@ td.bad{color:var(--red)}
     <div class="card c2">
       <div class="card-title">🚶 Pickup Candidates (&lt;2km)</div>
       <div class="tbl-wrap" id="geo-pickup"></div>
-    </div>
-  </div>
-  <div class="row">
-    <div class="card c3">
-      <div class="card-title">🔁 Delivery → Pickup Conversion Opportunities</div>
-      <div class="tbl-wrap" id="geo-conv"></div>
     </div>
   </div>
 
@@ -916,12 +841,6 @@ td.bad{color:var(--red)}
     <div class="card c1">
       <div class="card-title">🧮 Cost Waterfall</div>
       <svg id="pnl-svg" width="100%" height="200" viewBox="0 0 300 200"></svg>
-    </div>
-  </div>
-  <div class="row">
-    <div class="card c3">
-      <div class="card-title">🔍 P&amp;L Calculation Drill-down (Source Data)</div>
-      <div class="tbl-wrap" id="pnl-drill"></div>
     </div>
   </div>
 </div>
@@ -988,7 +907,7 @@ td.bad{color:var(--red)}
 ══════════════════════════════════════════════════════════════ -->
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────────
-const API = window.location.origin;
+const API = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
 
 // ── PLATFORM VALUES (exact from pipeline v5.1) ────────────────────────────
 const PLAT = {
@@ -1079,62 +998,6 @@ async function checkHealth() {
 // ── MODAL ──────────────────────────────────────────────────────────────────
 let _modalData = {}; // cache data for modal renders
 
-function drillExportLink(extra = {}) {
-  const p = new URLSearchParams(fp());
-  p.set('export_type', 'drill');
-  Object.entries(extra).forEach(([k, v]) => {
-    if (v !== null && v !== undefined && v !== '') p.set(k, v);
-  });
-  p.set('limit', '10000');
-  return `${API}/api/export/csv?${p.toString()}`;
-}
-
-async function showDrillOrders(title, extra = {}) {
-  el('modal-title').textContent = title;
-  el('modal-overlay').classList.add('open');
-  document.body.style.overflow = 'hidden';
-  el('modal-body').innerHTML = '<div class="loading"><span class="spin"></span> Loading details…</div>';
-  try {
-    const p = new URLSearchParams(fp());
-    Object.entries(extra).forEach(([k, v]) => {
-      if (v !== null && v !== undefined && v !== '') p.set(k, v);
-    });
-    if (extra.customer_contact) p.set('customer_contact', extra.customer_contact);
-    p.set('limit', '1000');
-    const d = await api('drill?' + p.toString());
-    const rows = d.rows || [];
-    const tableRows = rows.map(r => `
-      <tr>
-        <td class="mono">${r.order_id || '—'}</td>
-        <td>${r.order_date || '—'}</td>
-        <td>${r.customer_name || '—'}</td>
-        <td class="mono">${r.customer_contact || '—'}</td>
-        <td>${r.restaurant_name || '—'}</td>
-        <td>${PLAT[r.platform] || r.platform || '—'}</td>
-        <td>${r.delivery_type || '—'}</td>
-        <td class="num hi">${fmtR(r.order_value)}</td>
-      </tr>`).join('');
-    const exportUrl = drillExportLink(extra);
-    el('modal-body').innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap">
-        <div style="font-size:11px;color:var(--t2)">
-          Orders: <strong>${fmt(d?.totals?.total_orders || rows.length)}</strong> ·
-          GMV: <strong>${fmtK(d?.totals?.total_gmv || 0)}</strong> ·
-          Unique users: <strong>${fmt(d?.totals?.unique_customers || 0)}</strong>
-        </div>
-        <a class="fbtn sec" href="${exportUrl}" target="_blank" rel="noopener">⬇ Export CSV</a>
-      </div>
-      <div class="tbl-wrap">
-        <table>
-          <thead><tr><th>Order ID</th><th>Date</th><th>Name</th><th>Contact</th><th>Restaurant</th><th>Platform</th><th>Delivery</th><th>Value</th></tr></thead>
-          <tbody>${tableRows || '<tr><td colspan="8" class="loading">No matching orders</td></tr>'}</tbody>
-        </table>
-      </div>`;
-  } catch (e) {
-    el('modal-body').innerHTML = `<div class="empty"><div class="icon">⚠️</div><p>${e.message}</p></div>`;
-  }
-}
-
 function openModal(type, title) {
   el('modal-title').textContent = title;
   el('modal-overlay').classList.add('open');
@@ -1172,14 +1035,12 @@ function renderModalContent(type) {
     const monthly = d.monthly || [];
     body.innerHTML = '<svg id="modal-mom-svg" width="100%" height="350" viewBox="0 0 900 350"></svg>';
     if(monthly.length) setTimeout(()=>renderMoMChart(monthly,'modal-mom-svg',900,310),10);
-    setTimeout(bindMonthlyBarClicks, 20);
     return;
   }
   if (type === 'dod-full') {
     const daily = d.daily || [];
     body.innerHTML = '<svg id="modal-dod-svg" width="100%" height="350" viewBox="0 0 900 350"></svg>';
     if(daily.length) setTimeout(()=>renderDoDChart(daily,'modal-dod-svg',900,310),10);
-    setTimeout(bindDailyBarClicks, 20);
     return;
   }
   if (type === 'aov-full') {
@@ -1207,30 +1068,6 @@ function renderModalContent(type) {
     return;
   }
   body.innerHTML = '<div class="empty"><div class="icon">📊</div><p>No detail available.</p></div>';
-}
-
-function bindMonthlyBarClicks() {
-  const svg = el('modal-mom-svg');
-  if (!svg) return;
-  const bars = Array.from(svg.querySelectorAll('rect'));
-  bars.forEach((b, i) => {
-    const month = (_modalData.monthly || [])[i];
-    if (!month) return;
-    b.style.cursor = 'pointer';
-    b.addEventListener('click', () => showDrillOrders(`Orders — ${month.month_key}`, { month_key: month.month_key }));
-  });
-}
-
-function bindDailyBarClicks() {
-  const svg = el('modal-dod-svg');
-  if (!svg) return;
-  const bars = Array.from(svg.querySelectorAll('rect'));
-  bars.forEach((b, i) => {
-    const day = (_modalData.daily || [])[i];
-    if (!day) return;
-    b.style.cursor = 'pointer';
-    b.addEventListener('click', () => showDrillOrders(`Orders — ${day.order_date}`, { order_date: day.order_date }));
-  });
 }
 
 // ── INIT ───────────────────────────────────────────────────────────────────
@@ -1332,8 +1169,7 @@ function renderMoMChart(monthly, svgId, W=720, H=160) {
   const bars=monthly.map((m,i)=>{
     const bh=Math.max(((m.orders/maxO)*(H-pT-pB)).toFixed(0),2);
     const x=pL+i*bw, col=COLORS[i%COLORS.length];
-    return `<rect x="${(x+2).toFixed(0)}" y="${H-pB-bh}" width="${Math.max(bw-4,2).toFixed(0)}" height="${bh}" fill="${col}" rx="2" opacity=".85">
-      <title>${m.month_key} — ${fmt(m.orders)} orders</title></rect>
+    return `<rect x="${(x+2).toFixed(0)}" y="${H-pB-bh}" width="${Math.max(bw-4,2).toFixed(0)}" height="${bh}" fill="${col}" rx="2" opacity=".85"/>
       <text x="${(x+bw/2).toFixed(0)}" y="${H-pB-bh-4}" text-anchor="middle" fill="${col}" font-size="8.5" font-weight="700">${fmt(m.orders)}</text>
       <text x="${(x+bw/2).toFixed(0)}" y="${H-pB+14}" text-anchor="middle" fill="var(--t3)" font-size="8.5">${m.month_key}</text>`;
   }).join('');
@@ -1391,8 +1227,8 @@ function renderDailyChart(daily, dailyByPlatform, svgId, legId, W=800, H=95) {
     order.forEach(plat=>{
       const cnt=pd[plat]||0; if(!cnt) return;
       const ph=Math.max(((cnt/maxO)*(H-pT-pB)).toFixed(0),0.5);
-      out+=`<rect x="${x.toFixed(1)}" y="${(y-ph).toFixed(1)}" width="${Math.max(bw-0.5,0.3).toFixed(1)}" height="${ph.toFixed(1)}" fill="${PCOL[plat]||'#999'}" opacity=".85" style="cursor:pointer" onclick="showDrillOrders('Orders — ${d.order_date} (${PLAT[plat]||plat})',{order_date:'${d.order_date}',platform:'${plat}'})">
-        <title>${d.order_date} ${PLAT[plat]||plat}: ${fmt(cnt)} orders</title></rect>`;
+      out+=`<rect x="${x.toFixed(1)}" y="${(y-ph).toFixed(1)}" width="${Math.max(bw-0.5,0.3).toFixed(1)}" height="${ph.toFixed(1)}" fill="${PCOL[plat]||'#999'}" opacity=".85">
+        <title>${d.order_date} ${PLAT[plat]||plat}: ${fmt(cnt)}</title></rect>`;
       y-=ph;
     });
     return out;
@@ -1578,7 +1414,7 @@ async function loadOverview() {
       dh+=`<div style="font-size:10px;color:${PCOL[plat]||'#fff'};font-weight:700;margin:7px 0 4px">${PLAT[plat]||plat}</div>
            <div class="bars" style="gap:3px">`+rows.map((r,i)=>`
         <div class="brow"><div class="blbl w120">${r.delivery_type||'(none)'}</div>
-        <div class="btrack"><div class="bfill" style="width:${(r.cnt/maxC*100).toFixed(0)}%;background:${PCOL[plat]||COLORS[i]};cursor:pointer" onclick="showDrillOrders('Delivery Type — ${r.delivery_type||'Unknown'} (${PLAT[plat]||plat})',{delivery_type:'${(r.delivery_type||'').replace(/'/g,"\\'")}',platform:'${plat}'})">
+        <div class="btrack"><div class="bfill" style="width:${(r.cnt/maxC*100).toFixed(0)}%;background:${PCOL[plat]||COLORS[i]}">
           <span>${fmt(r.cnt)}</span></div></div></div>`).join('')+'</div>';
     });
     html('delivery-wrap', dh||'<div class="loading">No data</div>');
@@ -1606,46 +1442,14 @@ async function loadOverview() {
 async function loadTrends() {
   startLoad();
   try {
-    const [ov, aovD, tItems] = await Promise.all([api('overview?'+fp()), api('aov_monthly?'+fp()), api('trend_items?'+fp())]);
+    const [ov, aovD] = await Promise.all([api('overview?'+fp()), api('aov_monthly?'+fp())]);
     _modalData.monthly = ov.monthly;
     _modalData.daily   = ov.daily;
     _modalData.aovRows = aovD.rows||[];
     renderTrendsPage(ov);
     renderAOVChart(aovD.rows||[], 'aov-svg', 640, 140);
     renderAOVTable(aovD.rows||[]);
-    renderTrendItems(tItems);
   } catch(e){ console.error(e); } finally { endLoad(); }
-}
-
-function renderTrendItems(d){
-  const dayRows = (d.topPerDay||[]).flat().slice(0,20);
-  const maxD = Math.max(...dayRows.map(r=>Number(r.qty)||0),1);
-  html('tr-item-day', dayRows.map((r,i)=>`
-    <div class="brow">
-      <div class="blbl w200">${r.order_date} · ${r.product_name}</div>
-      <div class="btrack"><div class="bfill ${['gr0','gr1','gr2','gr3','gr4','gr5'][i%6]}" style="width:${(r.qty/maxD*100).toFixed(0)}%;cursor:pointer" onclick="showDrillOrders('Item Orders — ${String(r.product_name||'').replace(/'/g,"\\'")}',{product_name:'${String(r.product_name||'').replace(/'/g,"\\'")}'} )">
-        <span>${fmt(r.qty)}</span>
-      </div></div>
-    </div>`).join('') || '<div class="loading">No item trends</div>');
-
-  const hourRows = (d.topPerHour||[]).flat().slice(0,20);
-  const maxH = Math.max(...hourRows.map(r=>Number(r.qty)||0),1);
-  html('tr-item-hour', hourRows.map((r,i)=>`
-    <div class="brow">
-      <div class="blbl w200">${String(r.order_hour).padStart(2,'0')}:00 · ${r.product_name}</div>
-      <div class="btrack"><div class="bfill ${['gr2','gr3','gr4','gr5','gr0','gr1'][i%6]}" style="width:${(r.qty/maxH*100).toFixed(0)}%">
-        <span>${fmt(r.qty)}</span>
-      </div></div>
-    </div>`).join('') || '<div class="loading">No hourly item trends</div>');
-
-  const restRows = (d.bestRestPerItem||[]).slice(0,30).map(r=>`
-    <tr>
-      <td>${r.product_name||'—'}</td>
-      <td>${r.restaurant_name||'—'}</td>
-      <td class="num">${fmt(r.qty)}</td>
-      <td><button class="fbtn sec" style="font-size:10px;padding:2px 8px" onclick="showDrillOrders('Item Orders — ${String(r.product_name||'').replace(/'/g,"\\'")}',{product_name:'${String(r.product_name||'').replace(/'/g,"\\'")}'} )">View</button></td>
-    </tr>`).join('');
-  html('tr-item-rest', `<table><thead><tr><th>Item</th><th>Top Restaurant</th><th>Orders</th><th>Detail</th></tr></thead><tbody>${restRows||'<tr><td colspan="4" class="loading">No data</td></tr>'}</tbody></table>`);
 }
 
 function renderTrendsPage(ov) {
@@ -1742,7 +1546,7 @@ async function loadRestaurants() {
     const maxG=Math.max(...top.map(r=>r.gmv),1);
     html('rest-bars', top.slice(0,12).map((r,i)=>`
       <div class="brow"><div class="blbl">${r.name||r.shop_id||'—'}</div>
-      <div class="btrack"><div class="bfill ${['gr0','gr1','gr2','gr3','gr4','gr5'][i%6]}" style="width:${(r.gmv/maxG*100).toFixed(0)}%;cursor:pointer" onclick="showDrillOrders('Restaurant Orders — ${(r.name||r.shop_id||'').replace(/'/g,"\\'")}',{shop_id:'${r.shop_id}'})">
+      <div class="btrack"><div class="bfill ${['gr0','gr1','gr2','gr3','gr4','gr5'][i%6]}" style="width:${(r.gmv/maxG*100).toFixed(0)}%">
         <span>${fmtK(r.gmv)} · ${fmt(r.orders)}</span></div></div></div>`).join(''));
     const topAOV=top.reduce((a,b)=>Number(b.aov)>Number(a.aov)?b:a,top[0]);
     html('rest-kpis',`
@@ -1794,25 +1598,6 @@ async function loadFunnel() {
         <span>-${fmt(d.dropped)} (${d.pctV}%)</span></div></div></div>`).join(''));
     const c=d.conversion||{};
     if(c.overall_conversion_rate) html('fn-rates',`<strong>Pre-computed Rates (agg_funnel_conversion)</strong>PLP→Cart: ${c.plp_to_cart_rate||'—'}% · Cart→CX: ${c.cart_to_checkout_rate||'—'}% · CX→Order: ${c.checkout_to_order_rate||'—'}% · <strong>Overall: ${c.overall_conversion_rate}%</strong>`);
-
-    const wk = d.weeklyTrend||[];
-    const byDay = {};
-    wk.forEach(r=>{ const k=r.event_dow||'—'; byDay[k]=(byDay[k]||0)+Number(r.total||0); });
-    const wkRows = Object.entries(byDay).map(([dow,total])=>`<tr><td>${dow}</td><td class="num">${fmt(total)}</td></tr>`).join('');
-    html('fn-weekly', `<table><thead><tr><th>Day</th><th>Inflow</th></tr></thead><tbody>${wkRows||'<tr><td colspan="2" class="loading">No weekly data</td></tr>'}</tbody></table>`);
-
-    const hr = d.hourly||[];
-    const byHour={}; hr.forEach(r=>{ const k=r.event_hour; byHour[k]=(byHour[k]||0)+Number(r.total||0); });
-    const hourRows=Object.entries(byHour).sort((a,b)=>a[0]-b[0]).slice(0,24);
-    const maxH=Math.max(...hourRows.map(x=>x[1]),1);
-    html('fn-hourly', hourRows.map((x,i)=>`<div class="brow"><div class="blbl w120">${String(x[0]).padStart(2,'0')}:00</div><div class="btrack"><div class="bfill ${['gr0','gr1','gr2','gr3'][i%4]}" style="width:${(x[1]/maxH*100).toFixed(0)}%"><span>${fmt(x[1])}</span></div></div></div>`).join('') || '<div class="loading">No hourly data</div>');
-
-    const topRows=(d.topShops||[]).map(r=>`<tr><td>${r.restaurant_name||r.shop_id||'—'}</td><td class="num">${fmt(r.total_events)}</td><td class="num">${fmt(r.checkout)}</td><td class="num hi">${fmt(r.orders)}</td><td class="num">${fmt(r.unique_customers)}</td></tr>`).join('');
-    html('fn-top-shops', `<table><thead><tr><th>Restaurant</th><th>Events</th><th>Checkout</th><th>Orders</th><th>Unique</th></tr></thead><tbody>${topRows||'<tr><td colspan="5" class="loading">No store-wise data</td></tr>'}</tbody></table>`);
-
-    const dropRows=[...(d.cartNoCheckout||[]).slice(0,5).map(r=>({...r,stage:'Cart→No Checkout'})),...(d.checkoutNoOrder||[]).slice(0,5).map(r=>({...r,stage:'Checkout→No Order'}))]
-      .map(r=>`<tr><td>${r.stage}</td><td>${r.customer_name||'—'}</td><td class="mono">${r.customer_contact||'—'}</td><td>${r.restaurant_name||'—'}</td></tr>`).join('');
-    html('fn-drop-users', `<table><thead><tr><th>Stage</th><th>Name</th><th>Contact</th><th>Restaurant</th></tr></thead><tbody>${dropRows||'<tr><td colspan="4" class="loading">No drop-off users</td></tr>'}</tbody></table>`);
   } catch(e){ console.error(e); } finally { endLoad(); }
 }
 
@@ -1862,20 +1647,11 @@ async function loadFunnelWA() {
 
     // By campaign
     const ctrows=(d.byCampaign||[]).slice(0,10).map(c=>`
-      <tr><td style="font-size:10px;color:var(--t3)">${c.campaign_name||'—'}</td>
+      <tr><td style="font-size:10px;color:var(--t3)">${(c.campaign_id||'—').slice(-12)}</td>
           <td class="num">${fmt(c.total_events)}</td>
           <td class="num">${fmt(c.unique_customers)}</td>
           <td class="num hi">${fmt(c.orders)}</td></tr>`).join('');
     html('wa-fn-camp',`<table><thead><tr><th>Campaign</th><th>Events</th><th>Unique</th><th>Orders</th></tr></thead><tbody>${ctrows||'<tr><td colspan="4" class="loading">No campaign data</td></tr>'}</tbody></table>`);
-
-    const wk=d.weeklyTrend||[];
-    const byDay={}; wk.forEach(r=>{ const k=r.event_dow||'—'; byDay[k]=(byDay[k]||0)+Number(r.total||0); });
-    const wkRows=Object.entries(byDay).map(([dow,total])=>`<tr><td>${dow}</td><td class="num">${fmt(total)}</td></tr>`).join('');
-    html('wa-weekly', `<table><thead><tr><th>Day</th><th>Inflow</th></tr></thead><tbody>${wkRows||'<tr><td colspan="2" class="loading">No weekly data</td></tr>'}</tbody></table>`);
-
-    const dropRows=[...(d.cartNoCheckout||[]).slice(0,6).map(r=>({...r,stage:'Cart→No Checkout'})),...(d.checkoutNoOrder||[]).slice(0,6).map(r=>({...r,stage:'Checkout→No Order'}))]
-      .map(r=>`<tr><td>${r.stage}</td><td>${r.customer_name||'—'}</td><td class="mono">${r.customer_contact||'—'}</td><td>${r.restaurant_name||'—'}</td></tr>`).join('');
-    html('wa-drop-users', `<table><thead><tr><th>Stage</th><th>Name</th><th>Contact</th><th>Restaurant</th></tr></thead><tbody>${dropRows||'<tr><td colspan="4" class="loading">No drop-off users</td></tr>'}</tbody></table>`);
   } catch(e){ console.error(e); } finally { endLoad(); }
 }
 
@@ -1923,15 +1699,12 @@ async function loadCampaigns() {
 
     // Post-campaign orders
     const prows=(d.postOrders||[]).slice(0,50).map(r=>`
-      <tr><td class="mono">${r.order_id||'—'}</td>
-          <td class="mono">${r.mobile_number||'—'}</td>
-          <td>${r.order_timing||'—'}</td>
+      <tr><td class="mono">${r.mobile_number||'—'}</td>
           <td class="num hi">${fmtR(r.order_value)}</td>
           <td>${r.order_date||'—'}</td>
           <td>${r.restaurant_name||'—'}</td>
-          <td>${PLAT[r.platform]||r.platform||'—'}</td>
-          <td>${r.delivery_type||'—'}</td></tr>`).join('');
-    html('camp-post-orders',`<table><thead><tr><th>Order ID</th><th>Mobile</th><th>Timing</th><th>Value</th><th>Date</th><th>Restaurant</th><th>Platform</th><th>Delivery</th></tr></thead><tbody>${prows||'<tr><td colspan="8" class="loading">No post-campaign orders yet</td></tr>'}</tbody></table>`);
+          <td>${PLAT[r.platform]||r.platform||'—'}</td></tr>`).join('');
+    html('camp-post-orders',`<table><thead><tr><th>Mobile</th><th>Value</th><th>Date</th><th>Restaurant</th><th>Platform</th></tr></thead><tbody>${prows||'<tr><td colspan="5" class="loading">No post-campaign orders yet</td></tr>'}</tbody></table>`);
 
     if((d.postOrders||[]).length>0) {
       el('camp-conversion-note').style.display='block';
@@ -1962,25 +1735,7 @@ async function loadCampaigns() {
         <div class="prog-bar" style="margin-top:10px"><div class="prog-fill" style="width:${c.delivered_rate_pct||0}%;background:var(--green)"></div></div>
       </div>`).join('');
     html('camp-perf-table', cperf||'<div class="loading">No campaign performance data in agg_campaign_performance</div>');
-
-    const ncRows=(d.nonConverters||[]).slice(0,200).map(r=>`
-      <tr><td class="mono">${r.mobile_number||'—'}</td><td>${r.campaign_date||'—'}</td><td>${r.delivery_status||'—'}</td><td>${r.segment||'—'}</td><td class="num">${fmt(r.lifetime_orders)}</td><td>${r.last_order_date||'—'}</td></tr>`).join('');
-    html('camp-nonconv', `<table><thead><tr><th>Mobile</th><th>Campaign Date</th><th>Status</th><th>Segment</th><th>Lifetime Orders</th><th>Last Order</th></tr></thead><tbody>${ncRows||'<tr><td colspan="6" class="loading">No non-converters</td></tr>'}</tbody></table>`);
-
-    const waRows=(d.waFunnelActivity||[]).slice(0,100).map(r=>`<tr><td class="mono">${r.customer_contact||'—'}</td><td>${r.action||'—'}</td><td>${r.restaurant_name||'—'}</td><td class="num">${fmt(r.event_count)}</td><td>${r.last_activity||'—'}</td></tr>`).join('');
-    html('camp-funnel-wa', `<table><thead><tr><th>Contact</th><th>Action</th><th>Restaurant</th><th>Events</th><th>Last</th></tr></thead><tbody>${waRows||'<tr><td colspan="5" class="loading">No WA funnel activity</td></tr>'}</tbody></table>`);
-
-    const appRows=(d.appFunnelActivity||[]).slice(0,150).map(r=>`<tr><td class="mono">${r.customer_contact||'—'}</td><td>${r.action||'—'}</td><td>${r.restaurant_name||'—'}</td><td class="num">${fmt(r.event_count)}</td><td>${r.last_activity||'—'}</td></tr>`).join('');
-    html('camp-funnel-app', `<table><thead><tr><th>Contact</th><th>Action</th><th>Restaurant</th><th>Events</th><th>Last</th></tr></thead><tbody>${appRows||'<tr><td colspan="5" class="loading">No App funnel activity</td></tr>'}</tbody></table>`);
   } catch(e){ console.error(e); } finally { endLoad(); }
-}
-
-function exportCampaignNonConv() {
-  const cn=el('camp-sel')?.value;
-  if(!cn) return;
-  const a=document.createElement('a');
-  a.href=`${API}/api/campaign_nonconv?campaign_name=${encodeURIComponent(cn)}`;
-  a.click();
 }
 
 function exportCampaign(format) {
@@ -2121,7 +1876,7 @@ async function loadProducts() {
       const max=Math.max(...items.map(i=>i.qty),1);
       html(cid, items.length ? items.map((it,i)=>`
         <div class="brow"><div class="blbl">${it.product_name||'—'}</div>
-        <div class="btrack"><div class="bfill ${['gr0','gr1','gr2','gr3','gr4','gr5','gr6'][i%7]}" style="width:${(it.qty/max*100).toFixed(0)}%;cursor:pointer" onclick="showItemCustomers('${String(it.product_name||'').replace(/'/g,"\\'")}')">
+        <div class="btrack"><div class="bfill ${['gr0','gr1','gr2','gr3','gr4','gr5','gr6'][i%7]}" style="width:${(it.qty/max*100).toFixed(0)}%">
           <span>${fmt(it.qty)}</span></div></div></div>`).join('')
         : '<div class="loading">No data</div>');
     };
@@ -2155,31 +1910,9 @@ function renderProductMonth(m) {
   const max=Math.max(...items.map(i=>i.qty),1);
   html('monthly-top-items', items.length ? items.map((it,i)=>`
     <div class="brow"><div class="blbl">${it.product_name||'—'}</div>
-    <div class="btrack"><div class="bfill ${['gr0','gr1','gr2','gr3','gr4','gr5','gr6','gr0','gr1','gr2'][i]}" style="width:${(it.qty/max*100).toFixed(0)}%;cursor:pointer" onclick="showItemCustomers('${String(it.product_name||'').replace(/'/g,"\\'")}')">
+    <div class="btrack"><div class="bfill ${['gr0','gr1','gr2','gr3','gr4','gr5','gr6','gr0','gr1','gr2'][i]}" style="width:${(it.qty/max*100).toFixed(0)}%">
       <span>${fmt(it.qty)} · ${it.restaurant_name||''}</span></div></div></div>`).join('')
     : '<div class="loading">No items for this month</div>');
-}
-
-async function showItemCustomers(productName){
-  el('modal-title').textContent = `Customers — ${productName}`;
-  el('modal-overlay').classList.add('open');
-  document.body.style.overflow = 'hidden';
-  el('modal-body').innerHTML = '<div class="loading"><span class="spin"></span> Loading customers…</div>';
-  try{
-    const p=new URLSearchParams(fp());
-    p.set('product_name', productName);
-    const d=await api('item_customers?'+p.toString());
-    const rows=(d.rows||[]).map(r=>`<tr><td>${r.customer_name||'—'}</td><td class="mono">${r.customer_contact||'—'}</td><td>${r.restaurant_name||'—'}</td><td>${r.order_id||'—'}</td><td>${r.order_date||'—'}</td><td>${PLAT[r.platform]||r.platform||'—'}</td><td class="num hi">${fmtR(r.order_value)}</td></tr>`).join('');
-    const ex=drillExportLink({ product_name: productName });
-    el('modal-body').innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-        <div style="font-size:11px;color:var(--t2)">Orders: <strong>${fmt(d.summary?.total_orders||0)}</strong> · Unique customers: <strong>${fmt(d.summary?.unique_customers||0)}</strong> · GMV: <strong>${fmtK(d.summary?.total_gmv||0)}</strong></div>
-        <a class="fbtn sec" href="${ex}" target="_blank" rel="noopener">⬇ Export CSV</a>
-      </div>
-      <div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Contact</th><th>Restaurant</th><th>Order ID</th><th>Date</th><th>Platform</th><th>Value</th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="loading">No customers found</td></tr>'}</tbody></table></div>`;
-  }catch(e){
-    el('modal-body').innerHTML = `<div class="empty"><div class="icon">⚠️</div><p>${e.message}</p></div>`;
-  }
 }
 
 // ── GEO ───────────────────────────────────────────────────────────────────────
@@ -2188,9 +1921,7 @@ async function loadGeo() {
   try {
     const p=new URLSearchParams(fp());
     const minD=el('geo-min')?.value, maxD=el('geo-max')?.value;
-    const thresh=el('geo-thresh')?.value, minOrders=el('geo-min-orders')?.value;
     if(minD) p.set('min_dist',minD); if(maxD) p.set('max_dist',maxD);
-    if(thresh) p.set('pickup_threshold',thresh);
     const d=await api('geo?'+p);
     const k=d.kpis||{};
     html('geo-kpis',`
@@ -2208,19 +1939,16 @@ async function loadGeo() {
         <span>${fmt(b.orders)} · ${b.avg_dist}km avg</span></div></div></div>`).join(''));
 
     // Pickup candidates
-    const minOrdNum = Number(minOrders||1);
-    const pickupFiltered=(d.pickupCandidates||[]).filter(r=>Number(r.lifetime_orders||0)>=minOrdNum);
-    const ptrows=pickupFiltered.slice(0,50).map(r=>`
+    const ptrows=(d.pickupCandidates||[]).slice(0,50).map(r=>`
       <tr><td class="mono">${r.customer_contact||'—'}</td>
           <td>${r.customer_name&&r.customer_name!=='—'?r.customer_name:'—'}</td>
           <td>${r.restaurant_name||'—'}</td>
           <td class="num hi">${r.delivery_distance||'—'} km</td>
           <td>${r.customer_pincode||'—'}</td>
           <td><span class="pill ${r.segment==='VIP'?'pg':r.segment==='Loyal'?'po':r.segment==='Repeat'?'pb':'pp'}">${r.segment}</span></td>
-          <td class="num">${fmt(r.lifetime_orders)}</td>
-          <td><button class="fbtn sec" style="font-size:10px;padding:2px 8px" onclick="showDrillOrders('Customer Orders — ${String(r.customer_contact||'').replace(/'/g,"\\'")}',{customer_contact:'${String(r.customer_contact||'').replace(/'/g,"\\'")}'})">Orders</button></td></tr>`).join('');
+          <td class="num">${fmt(r.lifetime_orders)}</td></tr>`).join('');
     html('geo-pickup',`<table><thead><tr><th>Contact</th><th>Name</th><th>Restaurant</th><th>Distance</th><th>Pincode</th><th>Segment</th><th>Lifetime Ord</th></tr></thead>
-      <tbody>${ptrows||'<tr><td colspan="8" class="loading">No pickup candidates within threshold</td></tr>'}</tbody></table>`);
+      <tbody>${ptrows||'<tr><td colspan="7" class="loading">No pickup candidates within 2km</td></tr>'}</tbody></table>`);
 
     // Pincode bars
     const pins=d.byCustomerPincode||[];
@@ -2238,16 +1966,6 @@ async function loadGeo() {
           <td class="num">${r.avg_distance||'—'} km</td></tr>`).join('');
     html('geo-rest-table',`<table><thead><tr><th>Restaurant</th><th>Pincode</th><th>Orders</th><th>Cust Pincodes</th><th>Avg Distance</th></tr></thead>
       <tbody>${rrows||'<tr><td colspan="5" class="loading">No geo data</td></tr>'}</tbody></table>`);
-
-    const convRows=(d.delivToPickup||[]).slice(0,80).map(r=>`
-      <tr><td class="mono">${r.customer_contact||'—'}</td>
-          <td>${r.customer_name||'—'}</td>
-          <td>${r.restaurant_name||'—'}</td>
-          <td class="num hi">${r.delivery_distance||'—'} km</td>
-          <td>${r.customer_pincode||'—'}</td>
-          <td class="num">${fmt(r.lifetime_orders)}</td></tr>`).join('');
-    html('geo-conv',`<table><thead><tr><th>Contact</th><th>Name</th><th>Restaurant</th><th>Distance</th><th>Pincode</th><th>Lifetime Ord</th></tr></thead>
-      <tbody>${convRows||'<tr><td colspan="6" class="loading">No conversion opportunities</td></tr>'}</tbody></table>`);
   } catch(e){ console.error(e); } finally { endLoad(); }
 }
 
@@ -2255,9 +1973,7 @@ function exportGeo() {
   const p=new URLSearchParams(fp());
   p.set('export_type','geo');
   const minD=el('geo-min')?.value, maxD=el('geo-max')?.value;
-  const thresh=el('geo-thresh')?.value;
   if(minD) p.set('min_dist',minD); if(maxD) p.set('max_dist',maxD);
-  if(thresh) p.set('pickup_threshold',thresh);
   p.set('limit','10000');
   const a=document.createElement('a'); a.href=`${API}/api/export/csv?${p}`; a.click();
 }
@@ -2322,24 +2038,6 @@ async function loadPnl() {
         <text x="${x+(bww-3)/2}" y="${y-4}" text-anchor="middle" fill="${it.c}" font-size="7.5" font-weight="700">${fmtK(Math.abs(it.v))}</text>
         <text x="${x+(bww-3)/2}" y="162" text-anchor="middle" fill="var(--t3)" font-size="7">${it.l}</text>`;
     }).join('');
-
-    const p = new URLSearchParams(fp());
-    p.set('limit','500');
-    const drill = await api('drill?' + p.toString());
-    const drows=(drill.rows||[]).slice(0,200).map(r=>`
-      <tr>
-        <td class="mono">${r.order_id||'—'}</td>
-        <td>${r.order_date||'—'}</td>
-        <td>${PLAT[r.platform]||r.platform||'—'}</td>
-        <td>${r.restaurant_name||'—'}</td>
-        <td class="num">${fmtR(r.order_value)}</td>
-        <td class="num bad">-${fmtR(r.discount)}</td>
-        <td class="num">${fmtR(r.packing_charge)}</td>
-        <td class="num">${fmtR(r.delivery_charge)}</td>
-        <td class="num">${fmtR(r.tax)}</td>
-        <td class="num hi">${fmtR(r.net_revenue)}</td>
-      </tr>`).join('');
-    html('pnl-drill', `<table><thead><tr><th>Order ID</th><th>Date</th><th>Platform</th><th>Restaurant</th><th>GMV</th><th>Discount</th><th>Packing</th><th>Delivery</th><th>Tax</th><th>Net</th></tr></thead><tbody>${drows||'<tr><td colspan="10" class="loading">No source rows</td></tr>'}</tbody></table>`);
   } catch(e){ console.error(e); } finally { endLoad(); }
 }
 

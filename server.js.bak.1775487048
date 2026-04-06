@@ -274,82 +274,73 @@ app.get("/api/overview", async (req, res) => {
 
 // ════════════════════════════════════════════════════════════════════════════
 //  DRILL-DOWN — returns full order rows for any dimension click
+//  ?drill_type=month&month_key=2026-01   → all orders in Jan 2026
+//  ?drill_type=day&order_date=2026-01-15 → all orders on that day
+//  ?drill_type=delivery_type&delivery_type=Pickup&platform=swayo_app
+//  ?drill_type=restaurant&shop_id=X
 // ════════════════════════════════════════════════════════════════════════════
-async function fetchDrillRows(base = {}) {
-  const c = ["1=1"], v = [];
-
-  if (base.from) { c.push("fo.order_date >= ?"); v.push(base.from); }
-  if (base.to)   { c.push("fo.order_date <= ?"); v.push(base.to);   }
-  const platC = multiIn("fo.platform", base.platform, v); if (platC) c.push(platC);
-  const shopC = multiIn("fo.shop_id", base.shop_id, v);   if (shopC) c.push(shopC);
-
-  if (base.month_key) {
-    const [yr, mo] = String(base.month_key).split("-");
-    if (yr && mo) { c.push("fo.order_year = ?"); v.push(yr); c.push("fo.order_month = ?"); v.push(mo); }
-  }
-  if (base.order_date)    { c.push("fo.order_date = ?"); v.push(base.order_date); }
-  if (base.delivery_type) { c.push("fo.delivery_type = ?"); v.push(base.delivery_type); }
-  if (base.order_status)  { c.push("fo.order_status = ?");  v.push(base.order_status); }
-  if (base.customer_contact) { c.push("fo.customer_contact = ?"); v.push(base.customer_contact); }
-  if (base.has_coupon !== undefined && base.has_coupon !== "") { c.push("fo.has_coupon = ?"); v.push(base.has_coupon); }
-  if (base.product_name)  { c.push("fo.order_id IN (SELECT i.order_id FROM fact_order_items i WHERE i.product_name = ?)"); v.push(base.product_name); }
-
-  const limit = Math.min(parseInt(base.limit) || 500, 5000);
-  const rows = await q(`
-    SELECT DISTINCT
-      fo.order_id, fo.order_date, fo.order_dow, fo.order_hour,
-      fo.platform,
-      COALESCE(r.restaurant_name, fo.restaurant_name, fo.shop_id) AS restaurant_name,
-      fo.shop_id, fo.order_status,
-      COALESCE(dc.customer_name,'—') AS customer_name,
-      fo.customer_contact,
-      COALESCE(cb.customer_segment,'Unknown') AS customer_segment,
-      COALESCE(cb.total_orders,1) AS lifetime_orders,
-      fo.order_value, fo.net_revenue,
-      COALESCE(fo.discount,0) AS discount,
-      COALESCE(fo.packing_charge,0) AS packing_charge,
-      COALESCE(fo.delivery_charge,0) AS delivery_charge,
-      COALESCE(fo.tax,0) AS tax,
-      fo.delivery_type,
-      fo.has_coupon, fo.coupon_value,
-      fo.is_cancelled
-    FROM fact_orders fo
-    LEFT JOIN dim_restaurants r        ON r.shop_id = fo.shop_id
-    LEFT JOIN dim_customers dc         ON dc.customer_contact = fo.customer_contact
-    LEFT JOIN agg_customer_behavior cb ON cb.customer_contact = fo.customer_contact
-    WHERE ${c.join(" AND ")}
-    ORDER BY fo.order_date DESC, fo.order_id
-    LIMIT ${limit}`, v);
-
-  const [totals] = await q(`
-    SELECT COUNT(DISTINCT fo.order_id) AS total_orders,
-           SUM(fo.order_value) AS total_gmv,
-           COUNT(DISTINCT fo.customer_contact) AS unique_customers
-    FROM fact_orders fo WHERE ${c.join(" AND ")}`, v);
-
-  return { rows, totals: totals || {}, count: rows.length };
-}
-
 app.get("/api/drill", async (req, res) => {
-  try { res.json(await fetchDrillRows(req.query)); }
-  catch (e) { res.status(500).json({ error: e.message }); }
-});
+  try {
+    const c = ["1=1"], v = [];
+    const base = req.query;
 
-app.get("/api/orders_by_delivery_type", async (req, res) => {
-  try { res.json(await fetchDrillRows(req.query)); }
-  catch (e) { res.status(500).json({ error: e.message }); }
-});
-app.get("/api/orders_by_month", async (req, res) => {
-  try { res.json(await fetchDrillRows(req.query)); }
-  catch (e) { res.status(500).json({ error: e.message }); }
-});
-app.get("/api/orders_by_date", async (req, res) => {
-  try { res.json(await fetchDrillRows(req.query)); }
-  catch (e) { res.status(500).json({ error: e.message }); }
-});
-app.get("/api/restaurant_orders", async (req, res) => {
-  try { res.json(await fetchDrillRows(req.query)); }
-  catch (e) { res.status(500).json({ error: e.message }); }
+    // Base date/platform/shop filter
+    if (base.from)     { c.push("fo.order_date >= ?"); v.push(base.from); }
+    if (base.to)       { c.push("fo.order_date <= ?"); v.push(base.to);   }
+    const platC = multiIn("fo.platform", base.platform, v);
+    if (platC) c.push(platC);
+    const shopC = multiIn("fo.shop_id", base.shop_id, v);
+    if (shopC) c.push(shopC);
+
+    // Dimension-specific filter
+    if (base.month_key) {
+      const [yr, mo] = base.month_key.split("-");
+      c.push("fo.order_year = ?"); v.push(yr);
+      c.push("fo.order_month = ?"); v.push(mo);
+    }
+    if (base.order_date)   { c.push("fo.order_date = ?");    v.push(base.order_date); }
+    if (base.delivery_type){ c.push("fo.delivery_type = ?"); v.push(base.delivery_type); }
+    if (base.order_status) { c.push("fo.order_status = ?");  v.push(base.order_status); }
+    if (base.has_coupon !== undefined && base.has_coupon !== "") {
+      c.push("fo.has_coupon = ?"); v.push(base.has_coupon);
+    }
+
+    const limit = Math.min(parseInt(base.limit) || 500, 5000);
+
+    const rows = await q(`
+      SELECT DISTINCT
+        fo.order_id, fo.order_date, fo.order_dow, fo.order_hour,
+        fo.platform,
+        COALESCE(r.restaurant_name, fo.restaurant_name, fo.shop_id) AS restaurant_name,
+        fo.shop_id, fo.order_status,
+        COALESCE(dc.customer_name,'—') AS customer_name,
+        fo.customer_contact,
+        COALESCE(cb.customer_segment,'Unknown') AS customer_segment,
+        COALESCE(cb.total_orders,1) AS lifetime_orders,
+        fo.order_value, fo.net_revenue,
+        COALESCE(fo.discount,0) AS discount,
+        COALESCE(fo.packing_charge,0) AS packing_charge,
+        COALESCE(fo.delivery_charge,0) AS delivery_charge,
+        COALESCE(fo.tax,0) AS tax,
+        fo.delivery_type,
+        fo.has_coupon, fo.coupon_value,
+        fo.is_cancelled
+      FROM fact_orders fo
+      LEFT JOIN dim_restaurants r      ON r.shop_id           = fo.shop_id
+      LEFT JOIN dim_customers dc       ON dc.customer_contact = fo.customer_contact
+      LEFT JOIN agg_customer_behavior cb ON cb.customer_contact = fo.customer_contact
+      WHERE ${c.join(" AND ")}
+      ORDER BY fo.order_date DESC, fo.order_id
+      LIMIT ${limit}`, v);
+
+    const [totals] = await q(`
+      SELECT COUNT(DISTINCT fo.order_id) AS total_orders,
+             SUM(fo.order_value) AS total_gmv,
+             COUNT(DISTINCT fo.customer_contact) AS unique_customers
+      FROM fact_orders fo WHERE ${c.join(" AND ")}`, v);
+
+    res.json({ rows, totals: totals || {}, count: rows.length });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -456,7 +447,7 @@ app.get("/api/funnel", async (req, res) => {
     const hourly = await q(`
       SELECT event_hour, action, COUNT(*) AS total
       FROM fact_funnel WHERE ${fWhere}
-      GROUP BY event_hour, action ORDER BY event_hour, action`, fv);
+      GROUP BY event_hour, action ORDER BY event_hour, action_order`, fv);
 
     // Top 10 restaurants by funnel activity
     const topShops = await q(`
@@ -473,30 +464,45 @@ app.get("/api/funnel", async (req, res) => {
       GROUP BY ff.shop_id, r.restaurant_name
       ORDER BY total_events DESC LIMIT 10`, fv);
 
-    // Drop-off cohorts (single pass, faster than NOT IN subqueries)
-    const dropoffAgg = await q(`
+    // Cart but no checkout (contact details for follow-up)
+    const cartNoCheckout = await q(`
       SELECT ff.customer_contact,
              COALESCE(dc.customer_name,'—') AS customer_name,
              ff.shop_id,
              COALESCE(r.restaurant_name, ff.shop_id) AS restaurant_name,
-             SUM(CASE WHEN ff.action='VIEW_CART' THEN 1 ELSE 0 END) AS view_cart_count,
-             SUM(CASE WHEN ff.action='CHECKOUT' THEN 1 ELSE 0 END) AS checkout_count,
-             SUM(CASE WHEN ff.action='ORDER' THEN 1 ELSE 0 END) AS order_count,
+             COUNT(*) AS view_cart_count,
              MAX(ff.event_date) AS last_seen
       FROM fact_funnel ff
       LEFT JOIN dim_customers dc ON dc.customer_contact = ff.customer_contact
       LEFT JOIN dim_restaurants r ON r.shop_id = ff.shop_id
-      WHERE ${fWhere}
+      WHERE ${fWhere} AND ff.action = 'VIEW_CART'
         AND ff.customer_contact IS NOT NULL
-        AND ff.action IN ('VIEW_CART','CHECKOUT','ORDER')
+        AND ff.customer_contact NOT IN (
+          SELECT DISTINCT customer_contact FROM fact_funnel
+          WHERE action = 'CHECKOUT' AND ${fWhere}
+        )
       GROUP BY ff.customer_contact, dc.customer_name, ff.shop_id, r.restaurant_name
-      ORDER BY last_seen DESC LIMIT 200`, fv);
-    const cartNoCheckout = dropoffAgg
-      .filter(r => Number(r.view_cart_count) > 0 && Number(r.checkout_count) === 0)
-      .slice(0, 100);
-    const checkoutNoOrder = dropoffAgg
-      .filter(r => Number(r.checkout_count) > 0 && Number(r.order_count) === 0)
-      .slice(0, 100);
+      ORDER BY view_cart_count DESC LIMIT 100`, [...fv, ...fv]);
+
+    // Checkout but no order
+    const checkoutNoOrder = await q(`
+      SELECT ff.customer_contact,
+             COALESCE(dc.customer_name,'—') AS customer_name,
+             ff.shop_id,
+             COALESCE(r.restaurant_name, ff.shop_id) AS restaurant_name,
+             COUNT(*) AS checkout_count,
+             MAX(ff.event_date) AS last_seen
+      FROM fact_funnel ff
+      LEFT JOIN dim_customers dc ON dc.customer_contact = ff.customer_contact
+      LEFT JOIN dim_restaurants r ON r.shop_id = ff.shop_id
+      WHERE ${fWhere} AND ff.action = 'CHECKOUT'
+        AND ff.customer_contact IS NOT NULL
+        AND ff.customer_contact NOT IN (
+          SELECT DISTINCT customer_contact FROM fact_funnel
+          WHERE action = 'ORDER' AND ${fWhere}
+        )
+      GROUP BY ff.customer_contact, dc.customer_name, ff.shop_id, r.restaurant_name
+      ORDER BY checkout_count DESC LIMIT 100`, [...fv, ...fv]);
 
     // Conversion rates from agg
     const [conv] = await q(`
@@ -557,7 +563,7 @@ app.get("/api/funnel_wa", async (req, res) => {
     const hourly = await q(`
       SELECT event_hour, action, COUNT(*) AS total
       FROM fact_funnel_wa WHERE ${fWhere}
-      GROUP BY event_hour, action ORDER BY event_hour, action`, fv);
+      GROUP BY event_hour, action ORDER BY event_hour, action_order`, fv);
 
     // By campaign — grouped by campaign_name not campaign_id
     const byCampaign = await q(`
@@ -568,27 +574,39 @@ app.get("/api/funnel_wa", async (req, res) => {
       FROM fact_funnel_wa WHERE ${fWhere}
       GROUP BY campaign_id ORDER BY orders DESC LIMIT 20`, fv);
 
-    // WA drop-off cohorts (single pass)
-    const waDropoffAgg = await q(`
+    // Cart-no-checkout in WA
+    const cartNoCheckout = await q(`
       SELECT fw.customer_contact,
              fw.customer_name,
              fw.restaurant_name, fw.shop_id,
-             SUM(CASE WHEN fw.action='VIEW_CART' THEN 1 ELSE 0 END) AS view_cart_count,
-             SUM(CASE WHEN fw.action='CHECKOUT' THEN 1 ELSE 0 END) AS checkout_count,
-             SUM(CASE WHEN fw.action='ORDER' THEN 1 ELSE 0 END) AS order_count,
+             COUNT(*) AS view_cart_count,
              MAX(fw.event_date) AS last_seen
       FROM fact_funnel_wa fw
-      WHERE ${fWhere}
+      WHERE ${fWhere} AND fw.action = 'VIEW_CART'
         AND fw.customer_contact IS NOT NULL
-        AND fw.action IN ('VIEW_CART','CHECKOUT','ORDER')
+        AND fw.customer_contact NOT IN (
+          SELECT DISTINCT customer_contact FROM fact_funnel_wa
+          WHERE action = 'CHECKOUT' AND ${fWhere}
+        )
       GROUP BY fw.customer_contact, fw.customer_name, fw.restaurant_name, fw.shop_id
-      ORDER BY last_seen DESC LIMIT 200`, fv);
-    const cartNoCheckout = waDropoffAgg
-      .filter(r => Number(r.view_cart_count) > 0 && Number(r.checkout_count) === 0)
-      .slice(0, 100);
-    const checkoutNoOrder = waDropoffAgg
-      .filter(r => Number(r.checkout_count) > 0 && Number(r.order_count) === 0)
-      .slice(0, 100);
+      ORDER BY view_cart_count DESC LIMIT 100`, [...fv, ...fv]);
+
+    // Checkout-no-order in WA
+    const checkoutNoOrder = await q(`
+      SELECT fw.customer_contact,
+             fw.customer_name,
+             fw.restaurant_name, fw.shop_id,
+             COUNT(*) AS checkout_count,
+             MAX(fw.event_date) AS last_seen
+      FROM fact_funnel_wa fw
+      WHERE ${fWhere} AND fw.action = 'CHECKOUT'
+        AND fw.customer_contact IS NOT NULL
+        AND fw.customer_contact NOT IN (
+          SELECT DISTINCT customer_contact FROM fact_funnel_wa
+          WHERE action = 'ORDER' AND ${fWhere}
+        )
+      GROUP BY fw.customer_contact, fw.customer_name, fw.restaurant_name, fw.shop_id
+      ORDER BY checkout_count DESC LIMIT 100`, [...fv, ...fv]);
 
     res.json({ stages, weeklyTrend, hourly, byRestaurant, byCampaign, cartNoCheckout, checkoutNoOrder });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -698,7 +716,7 @@ app.get("/api/campaigns", async (req, res) => {
       ORDER BY cb.total_orders DESC`, cv);
 
     // Funnel activity for campaign recipients (WA funnel)
-    const waFunnelActivity = await q(`
+    const funnelActivity = await q(`
       SELECT fw.customer_contact, fw.action, fw.restaurant_name,
              COUNT(*) AS event_count, MAX(fw.event_date) AS last_activity
       FROM fact_funnel_wa fw
@@ -706,24 +724,9 @@ app.get("/api/campaigns", async (req, res) => {
         SELECT DISTINCT mobile_number FROM fact_campaigns WHERE ${cWhere}
       )
       GROUP BY fw.customer_contact, fw.action, fw.restaurant_name
-      ORDER BY fw.customer_contact, fw.action`, cv);
-    
-    const appFunnelActivity = await q(`
-      SELECT ff.customer_contact, ff.action,
-             COALESCE(r.restaurant_name, ff.shop_id) AS restaurant_name,
-             COUNT(*) AS event_count, MAX(ff.event_date) AS last_activity
-      FROM fact_funnel ff
-      LEFT JOIN dim_restaurants r ON r.shop_id = ff.shop_id
-      WHERE ff.customer_contact IN (
-        SELECT DISTINCT mobile_number FROM fact_campaigns WHERE ${cWhere}
-      )
-      GROUP BY ff.customer_contact, ff.action, r.restaurant_name, ff.shop_id
-      ORDER BY ff.customer_contact, ff.action`, cv);
+      ORDER BY fw.customer_contact, fw.action_order`, cv);
 
-    res.json({
-      perf, recipients, summary: summary||{}, postOrders, postItems, nonConverters,
-      waFunnelActivity, appFunnelActivity
-    });
+    res.json({ perf, recipients, summary: summary||{}, postOrders, postItems, nonConverters, funnelActivity });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -755,155 +758,6 @@ app.get("/api/campaign_nonconv", async (req, res) => {
       ORDER BY cb.total_orders DESC`, [campaign_name]);
 
     res.json({ count: rows.length, rows });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get("/api/campaign_non_converters", async (req, res) => {
-  try {
-    const campaign_name = req.query.campaign_name;
-    if (!campaign_name) { res.status(400).json({ error: "campaign_name required" }); return; }
-    const rows = await q(`
-      SELECT fc.mobile_number,
-             DATE(fc.scheduled_date) AS campaign_date,
-             fc.delivery_status,
-             COALESCE(cb.customer_segment,'Unknown') AS segment,
-             COALESCE(cb.total_orders,0) AS lifetime_orders,
-             cb.last_order_date,
-             COALESCE(cb.total_gmv,0) AS lifetime_gmv
-      FROM fact_campaigns fc
-      LEFT JOIN agg_customer_behavior cb ON cb.customer_contact = fc.mobile_number
-      WHERE fc.campaign_name = ? AND fc.is_delivered = 1
-        AND fc.mobile_number NOT IN (
-          SELECT DISTINCT fo2.customer_contact
-          FROM fact_orders fo2
-          WHERE fo2.order_date >= DATE(fc.scheduled_date)
-            AND fo2.customer_contact = fc.mobile_number
-        )
-      ORDER BY cb.total_orders DESC`, [campaign_name]);
-    res.json({ count: rows.length, rows });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get("/api/campaign_user_history", async (req, res) => {
-  try {
-    const cc = ["1=1"], cv = [];
-    if (req.query.campaign_name) { cc.push("fc.campaign_name = ?"); cv.push(req.query.campaign_name); }
-    if (req.query.from)          { cc.push("DATE(fc.scheduled_date) >= ?"); cv.push(req.query.from); }
-    if (req.query.to)            { cc.push("DATE(fc.scheduled_date) <= ?"); cv.push(req.query.to); }
-    const cWhere = cc.join(" AND ");
-    const rows = await q(`
-      SELECT fc.campaign_name, fc.mobile_number,
-             DATE(fc.scheduled_date) AS campaign_date,
-             fo.order_id, fo.order_date, fo.order_value, fo.delivery_type, fo.platform,
-             COALESCE(r.restaurant_name, fo.restaurant_name, fo.shop_id) AS restaurant_name,
-             CASE WHEN fo.order_date >= DATE(fc.scheduled_date) THEN 'after' ELSE 'before' END AS order_timing
-      FROM fact_campaigns fc
-      JOIN fact_orders fo ON fo.customer_contact = fc.mobile_number
-      LEFT JOIN dim_restaurants r ON r.shop_id = fo.shop_id
-      WHERE ${cWhere}
-      ORDER BY fc.mobile_number, fo.order_date DESC`, cv);
-    res.json({ rows, count: rows.length });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get("/api/campaign_funnel_activity", async (req, res) => {
-  try {
-    const cc = ["1=1"], cv = [];
-    if (req.query.campaign_name) { cc.push("campaign_name = ?"); cv.push(req.query.campaign_name); }
-    const cWhere = cc.join(" AND ");
-    const waRows = await q(`
-      SELECT fw.customer_contact, fw.action, fw.restaurant_name,
-             COUNT(*) AS event_count, MAX(fw.event_date) AS last_activity
-      FROM fact_funnel_wa fw
-      WHERE fw.customer_contact IN (SELECT DISTINCT mobile_number FROM fact_campaigns WHERE ${cWhere})
-      GROUP BY fw.customer_contact, fw.action, fw.restaurant_name
-      ORDER BY fw.customer_contact, fw.action`, cv);
-    const appRows = await q(`
-      SELECT ff.customer_contact, ff.action, COALESCE(r.restaurant_name, ff.shop_id) AS restaurant_name,
-             COUNT(*) AS event_count, MAX(ff.event_date) AS last_activity
-      FROM fact_funnel ff
-      LEFT JOIN dim_restaurants r ON r.shop_id = ff.shop_id
-      WHERE ff.customer_contact IN (SELECT DISTINCT mobile_number FROM fact_campaigns WHERE ${cWhere})
-      GROUP BY ff.customer_contact, ff.action, r.restaurant_name, ff.shop_id
-      ORDER BY ff.customer_contact, ff.action`, cv);
-    res.json({ wa: waRows, app: appRows });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get("/api/funnel_weekly", async (req, res) => {
-  try {
-    const source = req.query.source === "wa" ? "wa" : "app";
-    const table = source === "wa" ? "fact_funnel_wa" : "fact_funnel";
-    const fc = ["1=1"], fv = [];
-    if (req.query.from) { fc.push("event_date >= ?"); fv.push(req.query.from); }
-    if (req.query.to)   { fc.push("event_date <= ?"); fv.push(req.query.to); }
-    const where = fc.join(" AND ");
-    const weekly = await q(`
-      SELECT event_date, event_dow, WEEK(event_date) AS week_num, action, COUNT(*) AS total
-      FROM ${table} WHERE ${where}
-      GROUP BY event_date, event_dow, week_num, action
-      ORDER BY event_date`, fv);
-    const hourly = await q(`
-      SELECT event_hour, action, COUNT(*) AS total
-      FROM ${table} WHERE ${where}
-      GROUP BY event_hour, action ORDER BY event_hour`, fv);
-    res.json({ source, weekly, hourly });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get("/api/funnel_top_restaurants", async (req, res) => {
-  try {
-    const source = req.query.source === "wa" ? "wa" : "app";
-    const table = source === "wa" ? "fact_funnel_wa" : "fact_funnel";
-    const fc = ["1=1"], fv = [];
-    if (req.query.from) { fc.push("ff.event_date >= ?"); fv.push(req.query.from); }
-    if (req.query.to)   { fc.push("ff.event_date <= ?"); fv.push(req.query.to); }
-    const where = fc.join(" AND ");
-    const rows = await q(`
-      SELECT ff.shop_id, COALESCE(r.restaurant_name, ff.shop_id) AS restaurant_name,
-             COUNT(*) AS total_events,
-             SUM(CASE WHEN ff.action IN ('VIEW_CART','VIEW_CART') THEN 1 ELSE 0 END) AS view_cart,
-             SUM(CASE WHEN ff.action='CHECKOUT' THEN 1 ELSE 0 END) AS checkout,
-             SUM(CASE WHEN ff.action='ORDER' THEN 1 ELSE 0 END) AS orders,
-             COUNT(DISTINCT ff.customer_contact) AS unique_customers
-      FROM ${table} ff
-      LEFT JOIN dim_restaurants r ON r.shop_id = ff.shop_id
-      WHERE ${where}
-      GROUP BY ff.shop_id, r.restaurant_name
-      ORDER BY total_events DESC LIMIT 10`, fv);
-    res.json({ source, rows });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get("/api/funnel_dropoffs", async (req, res) => {
-  try {
-    const source = req.query.source === "wa" ? "wa" : "app";
-    const table = source === "wa" ? "fact_funnel_wa" : "fact_funnel";
-    const fc = ["1=1"], fv = [];
-    if (req.query.from) { fc.push("event_date >= ?"); fv.push(req.query.from); }
-    if (req.query.to)   { fc.push("event_date <= ?"); fv.push(req.query.to); }
-    const where = fc.join(" AND ");
-    const cartNoCheckout = await q(`
-      SELECT f.customer_contact, COALESCE(dc.customer_name,'—') AS customer_name,
-             f.shop_id, COALESCE(r.restaurant_name, f.shop_id) AS restaurant_name, COUNT(*) AS cnt
-      FROM ${table} f
-      LEFT JOIN dim_customers dc ON dc.customer_contact = f.customer_contact
-      LEFT JOIN dim_restaurants r ON r.shop_id = f.shop_id
-      WHERE ${where} AND f.action='VIEW_CART' AND f.customer_contact IS NOT NULL
-        AND f.customer_contact NOT IN (SELECT DISTINCT customer_contact FROM ${table} WHERE action='CHECKOUT' AND ${where})
-      GROUP BY f.customer_contact, dc.customer_name, f.shop_id, r.restaurant_name
-      ORDER BY cnt DESC LIMIT 200`, [...fv, ...fv]);
-    const checkoutNoOrder = await q(`
-      SELECT f.customer_contact, COALESCE(dc.customer_name,'—') AS customer_name,
-             f.shop_id, COALESCE(r.restaurant_name, f.shop_id) AS restaurant_name, COUNT(*) AS cnt
-      FROM ${table} f
-      LEFT JOIN dim_customers dc ON dc.customer_contact = f.customer_contact
-      LEFT JOIN dim_restaurants r ON r.shop_id = f.shop_id
-      WHERE ${where} AND f.action='CHECKOUT' AND f.customer_contact IS NOT NULL
-        AND f.customer_contact NOT IN (SELECT DISTINCT customer_contact FROM ${table} WHERE action='ORDER' AND ${where})
-      GROUP BY f.customer_contact, dc.customer_name, f.shop_id, r.restaurant_name
-      ORDER BY cnt DESC LIMIT 200`, [...fv, ...fv]);
-    res.json({ source, cartNoCheckout, checkoutNoOrder });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1297,7 +1151,7 @@ app.get("/api/coupons", async (req, res) => {
       LEFT JOIN dim_restaurants r ON r.shop_id = fo.shop_id
       WHERE ${where} AND fo.has_coupon = 1
       GROUP BY fo.coupon_value, fo.discount, fo.platform,
-               r.restaurant_name, fo.restaurant_name, fo.shop_id, fo.delivery_type
+               r.restaurant_name, fo.restaurant_name, fo.delivery_type
       ORDER BY times_used DESC LIMIT 50`, vals);
 
     // Individual coupon uses with customer details
@@ -1324,9 +1178,9 @@ app.get("/api/coupons", async (req, res) => {
              SUM(COALESCE(fo.discount,0)) AS total_discount_given,
              ROUND(AVG(fo.order_value),2) AS avg_aov_with_coupon,
              (SELECT ROUND(AVG(order_value),2) FROM fact_orders fo2
-               WHERE ${where.replace(/fo\./g,'fo2.')} AND fo2.has_coupon = 0) AS avg_aov_without_coupon
+              WHERE ${where.replace(/fo\./g,'fo2.')} AND fo2.has_coupon = 0) AS avg_aov_without_coupon
       FROM fact_orders fo
-      WHERE ${where} AND fo.has_coupon = 1`, [...vals, ...vals]);
+      WHERE ${where} AND fo.has_coupon = 1`, vals);
 
     res.json({ byCoupon, detail, summary: summary||{} });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1627,48 +1481,6 @@ function buildExportQuery(query) {
       LEFT JOIN dim_customers dc ON dc.customer_contact = fo.customer_contact
       WHERE ${w.join(" AND ")} ORDER BY fo.order_date DESC LIMIT ${limit}`;
     return { sql, params, filename: "coupon_orders" };
-  }
-
-  if (type === "drill") {
-    const w = ["1=1"];
-    if (query.from) { w.push("fo.order_date >= ?"); params.push(query.from); }
-    if (query.to)   { w.push("fo.order_date <= ?"); params.push(query.to); }
-    const pC = mIn("fo.platform", query.platform); if (pC) w.push(pC);
-    const sC = mIn("fo.shop_id", query.shop_id);   if (sC) w.push(sC);
-    if (query.month_key) {
-      const [yr, mo] = String(query.month_key).split("-");
-      if (yr && mo) {
-        w.push("fo.order_year = ?"); params.push(yr);
-        w.push("fo.order_month = ?"); params.push(mo);
-      }
-    }
-    if (query.order_date)    { w.push("fo.order_date = ?"); params.push(query.order_date); }
-    if (query.delivery_type) { w.push("fo.delivery_type = ?"); params.push(query.delivery_type); }
-    if (query.order_status)  { w.push("fo.order_status = ?"); params.push(query.order_status); }
-    if (query.has_coupon !== undefined && query.has_coupon !== "") {
-      w.push("fo.has_coupon = ?"); params.push(query.has_coupon);
-    }
-    if (query.product_name) {
-      w.push("fo.order_id IN (SELECT i.order_id FROM fact_order_items i WHERE i.product_name = ?)");
-      params.push(query.product_name);
-    }
-    const sql = `
-      SELECT DISTINCT fo.order_id, fo.order_date, fo.order_dow, fo.order_hour, fo.platform,
-             COALESCE(r.restaurant_name, fo.restaurant_name, fo.shop_id) AS restaurant_name,
-             fo.shop_id, fo.order_status, COALESCE(dc.customer_name,'—') AS customer_name,
-             fo.customer_contact, COALESCE(cb.customer_segment,'Unknown') AS customer_segment,
-             COALESCE(cb.total_orders,1) AS lifetime_orders, fo.order_value, fo.net_revenue,
-             COALESCE(fo.discount,0) AS discount, COALESCE(fo.packing_charge,0) AS packing_charge,
-             COALESCE(fo.delivery_charge,0) AS delivery_charge, COALESCE(fo.tax,0) AS tax,
-             fo.delivery_type, fo.has_coupon, fo.coupon_value, fo.is_cancelled
-      FROM fact_orders fo
-      LEFT JOIN dim_restaurants r ON r.shop_id = fo.shop_id
-      LEFT JOIN dim_customers dc ON dc.customer_contact = fo.customer_contact
-      LEFT JOIN agg_customer_behavior cb ON cb.customer_contact = fo.customer_contact
-      WHERE ${w.join(" AND ")}
-      ORDER BY fo.order_date DESC, fo.order_id
-      LIMIT ${limit}`;
-    return { sql, params, filename: "order_drilldown" };
   }
 
   throw new Error(`Unknown export_type: ${type}`);

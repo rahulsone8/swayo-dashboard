@@ -1291,8 +1291,20 @@ app.get("/api/item_customers", async (req, res) => {
 app.get("/api/trend_items", async (req, res) => {
   try {
     const { where, vals } = ordersWhere(req.query);
+    const { trend_date, trend_month } = req.query;
 
-    // Top items per day
+    // Build additional filter for trend_date or trend_month
+    let trendDateFilter = "";
+    const trendVals = [...vals];
+    if (trend_date) {
+      trendDateFilter = " AND fo.order_date = ?";
+      trendVals.push(trend_date);
+    } else if (trend_month) {
+      trendDateFilter = " AND DATE_FORMAT(fo.order_date, '%Y-%m') = ?";
+      trendVals.push(trend_month);
+    }
+
+    // Top items per day (filtered by trend_date or trend_month if provided)
     const perDay = await q(`
       SELECT fo.order_date, i.product_name,
              COALESCE(r.restaurant_name, fo.restaurant_name) AS restaurant_name,
@@ -1300,37 +1312,69 @@ app.get("/api/trend_items", async (req, res) => {
       FROM fact_order_items i
       JOIN fact_orders fo ON fo.order_id = i.order_id
       LEFT JOIN dim_restaurants r ON r.shop_id = fo.shop_id
-      WHERE ${where}
+      WHERE ${where}${trendDateFilter}
         AND i.product_name IS NOT NULL
         AND LOWER(TRIM(i.product_name)) NOT IN ('nan','none','null','','n/a')
       GROUP BY fo.order_date, i.product_name, r.restaurant_name, fo.restaurant_name
-      ORDER BY fo.order_date, qty DESC`, vals);
+      ORDER BY fo.order_date DESC, qty DESC`, trendVals);
 
-    // Top items by hour
+    // Top items by hour - filter to restaurant hours (7 AM to midnight = hours 7-23)
     const perHour = await q(`
       SELECT fo.order_hour, i.product_name,
              COUNT(DISTINCT fo.order_id) AS qty
       FROM fact_order_items i
       JOIN fact_orders fo ON fo.order_id = i.order_id
-      WHERE ${where}
+      WHERE ${where}${trendDateFilter}
         AND i.product_name IS NOT NULL
         AND LOWER(TRIM(i.product_name)) NOT IN ('nan','none','null','','n/a')
+        AND fo.order_hour >= 7 AND fo.order_hour <= 23
       GROUP BY fo.order_hour, i.product_name
-      ORDER BY fo.order_hour, qty DESC`, vals);
+      ORDER BY fo.order_hour ASC, qty DESC`, trendVals);
 
-    // Best restaurant per item
-    const bestRestPerItem = await q(`
+    // Best restaurant per item - DAILY (for selected date/month)
+    const bestRestDaily = await q(`
       SELECT i.product_name,
              COALESCE(r.restaurant_name, fo.restaurant_name) AS restaurant_name,
-             COUNT(DISTINCT fo.order_id) AS qty
+             COUNT(DISTINCT fo.order_id) AS qty,
+             fo.order_date
       FROM fact_order_items i
       JOIN fact_orders fo ON fo.order_id = i.order_id
       LEFT JOIN dim_restaurants r ON r.shop_id = fo.shop_id
-      WHERE ${where}
+      WHERE ${where}${trendDateFilter}
         AND i.product_name IS NOT NULL
         AND LOWER(TRIM(i.product_name)) NOT IN ('nan','none','null','','n/a')
-      GROUP BY i.product_name, r.restaurant_name, fo.restaurant_name
-      ORDER BY i.product_name, qty DESC`, vals);
+      GROUP BY i.product_name, r.restaurant_name, fo.restaurant_name, fo.order_date
+      ORDER BY i.product_name, qty DESC`, trendVals);
+
+    // Best restaurant per item - MONTHLY aggregate
+    const bestRestMonthly = await q(`
+      SELECT i.product_name,
+             COALESCE(r.restaurant_name, fo.restaurant_name) AS restaurant_name,
+             COUNT(DISTINCT fo.order_id) AS qty,
+             DATE_FORMAT(fo.order_date, '%Y-%m') AS month_key
+      FROM fact_order_items i
+      JOIN fact_orders fo ON fo.order_id = i.order_id
+      LEFT JOIN dim_restaurants r ON r.shop_id = fo.shop_id
+      WHERE ${where}${trendDateFilter}
+        AND i.product_name IS NOT NULL
+        AND LOWER(TRIM(i.product_name)) NOT IN ('nan','none','null','','n/a')
+      GROUP BY i.product_name, r.restaurant_name, fo.restaurant_name, DATE_FORMAT(fo.order_date, '%Y-%m')
+      ORDER BY i.product_name, qty DESC`, trendVals);
+
+    // Get available dates and months for filter dropdowns
+    const availableDates = await q(`
+      SELECT DISTINCT fo.order_date
+      FROM fact_orders fo
+      WHERE ${where}
+      ORDER BY fo.order_date DESC
+      LIMIT 90`, vals);
+
+    const availableMonths = await q(`
+      SELECT DISTINCT DATE_FORMAT(fo.order_date, '%Y-%m') AS month_key
+      FROM fact_orders fo
+      WHERE ${where}
+      ORDER BY month_key DESC
+      LIMIT 24`, vals);
 
     // Keep top 3 per day and per hour in JS
     const topPerDay = {};
@@ -1344,7 +1388,36 @@ app.get("/api/trend_items", async (req, res) => {
       if (topPerHour[r.order_hour].length < 3) topPerHour[r.order_hour].push(r);
     });
 
-    res.json({ topPerDay: Object.values(topPerDay), topPerHour: Object.values(topPerHour), bestRestPerItem });
+    // Best restaurant per item - keep only top restaurant per item for daily
+    const bestRestPerItemDaily = {};
+    bestRestDaily.forEach(r => {
+      if (!bestRestPerItemDaily[r.product_name]) bestRestPerItemDaily[r.product_name] = r;
+    });
+
+    // Best restaurant per item - keep only top restaurant per item for monthly
+    const bestRestPerItemMonthly = {};
+    bestRestMonthly.forEach(r => {
+      if (!bestRestPerItemMonthly[r.product_name]) bestRestPerItemMonthly[r.product_name] = r;
+    });
+
+    // Combine daily and monthly into single response
+    const bestRestPerItem = Object.keys(bestRestPerItemDaily).map(item => ({
+      product_name: item,
+      daily_restaurant: bestRestPerItemDaily[item]?.restaurant_name || '—',
+      daily_qty: bestRestPerItemDaily[item]?.qty || 0,
+      daily_date: bestRestPerItemDaily[item]?.order_date || null,
+      monthly_restaurant: bestRestPerItemMonthly[item]?.restaurant_name || '—',
+      monthly_qty: bestRestPerItemMonthly[item]?.qty || 0,
+      monthly_key: bestRestPerItemMonthly[item]?.month_key || null
+    }));
+
+    res.json({
+      topPerDay: Object.values(topPerDay),
+      topPerHour: Object.values(topPerHour),
+      bestRestPerItem,
+      availableDates: availableDates.map(d => d.order_date),
+      availableMonths: availableMonths.map(m => m.month_key)
+    });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

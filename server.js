@@ -309,9 +309,10 @@ async function fetchDrillRows(base = {}) {
   if (base.order_status)  { c.push("fo.order_status = ?");  v.push(base.order_status); }
   if (base.customer_contact) { c.push("fo.customer_contact = ?"); v.push(base.customer_contact); }
   if (base.has_coupon !== undefined && base.has_coupon !== "") { c.push("fo.has_coupon = ?"); v.push(base.has_coupon); }
-  if (base.product_name)  { c.push("fo.order_id IN (SELECT i.order_id FROM fact_order_items i WHERE i.product_name = ?)"); v.push(base.product_name); }
+  if (base.product_name)  { c.push("fo.order_id IN (SELECT i.order_id FROM fact_order_items i WHERE TRIM(i.product_name) = TRIM(?))"); v.push(base.product_name); }
 
   const limit = Math.min(parseInt(base.limit) || 500, 5000);
+  const offset = parseInt(base.offset) || 0;
   const rows = await q(`
     SELECT DISTINCT
       fo.order_id, fo.order_date, fo.order_dow, fo.order_hour,
@@ -336,7 +337,7 @@ async function fetchDrillRows(base = {}) {
     LEFT JOIN agg_customer_behavior cb ON cb.customer_contact = fo.customer_contact
     WHERE ${c.join(" AND ")}
     ORDER BY fo.order_date DESC, fo.order_id
-    LIMIT ${limit}`, v);
+    LIMIT ${limit} OFFSET ${offset}`, v);
 
   const [totals] = await q(`
     SELECT COUNT(DISTINCT fo.order_id) AS total_orders,
@@ -344,7 +345,7 @@ async function fetchDrillRows(base = {}) {
            COUNT(DISTINCT fo.customer_contact) AS unique_customers
     ${ordersFrom} WHERE ${c.join(" AND ")}`, v);
 
-  return { rows, totals: totals || {}, count: rows.length };
+  return { rows, totals: totals || {}, count: rows.length, limit, offset, total: totals?.total_orders || 0 };
 }
 
 app.get("/api/drill", async (req, res) => {
@@ -1318,19 +1319,21 @@ app.get("/api/trend_items", async (req, res) => {
       GROUP BY fo.order_hour, i.product_name
       ORDER BY fo.order_hour, qty DESC`, vals);
 
-    // Best restaurant per item
+    // Best restaurant per item - group by shop_id for consistency, then show best restaurant name
     const bestRestPerItem = await q(`
-      SELECT i.product_name,
-             COALESCE(r.restaurant_name, fo.restaurant_name) AS restaurant_name,
-             COUNT(DISTINCT fo.order_id) AS qty
+      SELECT 
+        i.product_name,
+        fo.shop_id,
+        COALESCE(MAX(r.restaurant_name), MAX(fo.restaurant_name), fo.shop_id) AS restaurant_name,
+        COUNT(DISTINCT fo.order_id) AS qty
       FROM fact_order_items i
       JOIN fact_orders fo ON fo.order_id = i.order_id
       LEFT JOIN dim_restaurants r ON r.shop_id = fo.shop_id
       WHERE ${where}
         AND i.product_name IS NOT NULL
         AND LOWER(TRIM(i.product_name)) NOT IN ('nan','none','null','','n/a')
-      GROUP BY i.product_name, r.restaurant_name, fo.restaurant_name
-      ORDER BY i.product_name, qty DESC`, vals);
+      GROUP BY i.product_name, fo.shop_id
+      ORDER BY qty DESC, i.product_name`, vals);
 
     // Keep top 3 per day and per hour in JS
     const topPerDay = {};

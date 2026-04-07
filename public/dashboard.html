@@ -680,13 +680,13 @@ td.bad{color:var(--red)}
 
   <div class="sec-h">💰 Avg Order Value per Month (Food Only)</div>
   <div class="row">
-    <div class="card c2 clickable" onclick="openModal('aov-full','AOV Trend — Full View')">
-      <div class="card-title">AOV — Excl. Delivery / Tax / Convenience <span class="expand-hint">🔍</span></div>
-      <svg id="aov-svg" width="100%" height="150" viewBox="0 0 640 150"></svg>
+    <div class="card c2">
+      <div class="card-title">AOV — Excl. Delivery / Tax / Convenience</div>
+      <svg id="aov-svg" width="100%" height="100" viewBox="0 0 640 100"></svg>
     </div>
     <div class="card c1">
       <div class="card-title">AOV by Platform per Month</div>
-      <div class="tbl-wrap" id="aov-table"></div>
+      <div class="tbl-wrap" id="aov-table" style="max-height:150px;overflow-y:auto"></div>
     </div>
   </div>
 
@@ -703,20 +703,48 @@ td.bad{color:var(--red)}
   </div>
 
   <div class="sec-h">🍱 Item Trends</div>
+  
+  <!-- Item Trends Filter Bar -->
+  <div class="filter-bar" style="margin-bottom:12px;padding:10px 14px;background:var(--bg2);border-radius:8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <label style="font-size:11px;color:var(--t2)">📅 Filter Date:
+      <input type="date" id="item-date-filter" style="margin-left:6px;padding:4px 8px;background:var(--bg1);border:1px solid var(--bdr);border-radius:4px;color:var(--t1);font-size:11px">
+    </label>
+    <label style="font-size:11px;color:var(--t2)">📆 Filter Month:
+      <select id="item-month-filter" style="margin-left:6px;padding:4px 8px;background:var(--bg1);border:1px solid var(--bdr);border-radius:4px;color:var(--t1);font-size:11px">
+        <option value="">All Months</option>
+      </select>
+    </label>
+    <button class="fbtn sec" style="font-size:10px;padding:4px 12px" onclick="applyItemTrendFilters()">Apply</button>
+    <button class="fbtn" style="font-size:10px;padding:4px 12px;background:transparent;border:1px solid var(--bdr)" onclick="resetItemTrendFilters()">Reset</button>
+  </div>
+
   <div class="row">
     <div class="card c2">
-      <div class="card-title">Top Items by Day (click item for orders)</div>
-      <div class="bars" id="tr-item-day"></div>
+      <div class="card-title">📊 Top Items by Day <span style="font-size:10px;color:var(--t3);font-weight:400">(click item for orders)</span></div>
+      <div class="bars" id="tr-item-day" style="max-height:320px;overflow-y:auto"></div>
     </div>
     <div class="card c1">
-      <div class="card-title">Top Items by Hour</div>
-      <div class="bars" id="tr-item-hour"></div>
+      <div class="card-title">⏰ Top Items by Hour <span style="font-size:10px;color:var(--t3);font-weight:400">(7AM–12AM)</span></div>
+      <div class="bars" id="tr-item-hour" style="max-height:320px;overflow-y:auto"></div>
     </div>
   </div>
   <div class="row">
     <div class="card c3">
-      <div class="card-title">Best Restaurant per Item (Daily+Monthly)</div>
-      <div class="tbl-wrap" id="tr-item-rest"></div>
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <span>🏆 Best Restaurant per Item</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="item-rest-search" placeholder="🔍 Search item..." style="padding:4px 10px;font-size:10px;background:var(--bg1);border:1px solid var(--bdr);border-radius:4px;color:var(--t1);width:140px" oninput="filterBestRestPerItem()">
+          <select id="item-rest-filter" style="padding:4px 8px;font-size:10px;background:var(--bg1);border:1px solid var(--bdr);border-radius:4px;color:var(--t1)" onchange="filterBestRestPerItem()">
+            <option value="">All Restaurants</option>
+          </select>
+          <select id="item-rest-sort" style="padding:4px 8px;font-size:10px;background:var(--bg1);border:1px solid var(--bdr);border-radius:4px;color:var(--t1)" onchange="filterBestRestPerItem()">
+            <option value="qty">Sort: Orders ↓</option>
+            <option value="name">Sort: Item A-Z</option>
+            <option value="rest">Sort: Restaurant A-Z</option>
+          </select>
+        </div>
+      </div>
+      <div class="tbl-wrap" id="tr-item-rest" style="max-height:400px;overflow-y:auto"></div>
     </div>
   </div>
 </div>
@@ -1395,23 +1423,33 @@ function drillExportLink(extra = {}) {
   return `${API}/api/export/csv?${p.toString()}`;
 }
 
-async function showDrillOrders(title, extra = {}) {
+async function showDrillOrders(title, extra = {}, page = 0) {
+  const pageSize = 100;
   el('modal-title').textContent = title;
   el('modal-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
   el('modal-body').innerHTML = '<div class="loading"><span class="spin"></span> Loading details…</div>';
+  
+  // Store current drill params for pagination
+  window._currentDrillParams = { title, extra };
+  
   try {
     const p = new URLSearchParams(fp());
     Object.entries(extra).forEach(([k, v]) => {
       if (v !== null && v !== undefined && v !== '') p.set(k, v);
     });
     if (extra.customer_contact) p.set('customer_contact', extra.customer_contact);
-    p.set('limit', '1000');
+    p.set('limit', String(pageSize));
+    p.set('offset', String(page * pageSize));
     const d = await api('drill?' + p.toString());
     const rows = d.rows || [];
+    const totalOrders = d.totals?.total_orders || 0;
+    const totalPages = Math.ceil(totalOrders / pageSize);
+    const currentPage = page;
+    
     const tableRows = rows.map(r => `
       <tr>
-        <td class="mono">${r.order_id || '—'}</td>
+        <td class="mono" style="font-size:10px">${r.order_id || '—'}</td>
         <td>${normDate(r.order_date) || '—'}</td>
         <td>${r.customer_name || '—'}</td>
         <td class="mono">${r.customer_contact || '—'}</td>
@@ -1421,24 +1459,59 @@ async function showDrillOrders(title, extra = {}) {
         <td class="num hi">${fmtR(r.order_value)}</td>
       </tr>`).join('');
     const exportUrl = drillExportLink(extra);
+    
+    // Build pagination controls
+    let paginationHtml = '';
+    if (totalPages > 1) {
+      const pageNums = [];
+      const showPages = 7;
+      let start = Math.max(0, currentPage - 3);
+      let end = Math.min(totalPages, start + showPages);
+      if (end - start < showPages) start = Math.max(0, end - showPages);
+      
+      if (start > 0) pageNums.push({ n: 0, label: '1' });
+      if (start > 1) pageNums.push({ n: -1, label: '...' });
+      for (let i = start; i < end; i++) pageNums.push({ n: i, label: String(i + 1) });
+      if (end < totalPages - 1) pageNums.push({ n: -1, label: '...' });
+      if (end < totalPages) pageNums.push({ n: totalPages - 1, label: String(totalPages) });
+      
+      paginationHtml = `
+        <div style="display:flex;justify-content:center;align-items:center;gap:6px;margin-top:12px;padding-top:12px;border-top:1px solid var(--bdr)">
+          <button class="fbtn" style="padding:4px 10px;font-size:10px" ${currentPage === 0 ? 'disabled' : ''} onclick="drillGoToPage(${currentPage - 1})">← Prev</button>
+          ${pageNums.map(pg => pg.n === -1 
+            ? `<span style="color:var(--t3)">...</span>`
+            : `<button class="fbtn ${pg.n === currentPage ? 'sec' : ''}" style="padding:4px 10px;font-size:10px;min-width:32px" onclick="drillGoToPage(${pg.n})">${pg.label}</button>`
+          ).join('')}
+          <button class="fbtn" style="padding:4px 10px;font-size:10px" ${currentPage >= totalPages - 1 ? 'disabled' : ''} onclick="drillGoToPage(${currentPage + 1})">Next →</button>
+          <span style="font-size:10px;color:var(--t3);margin-left:8px">Page ${currentPage + 1} of ${totalPages}</span>
+        </div>`;
+    }
+    
     el('modal-body').innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap">
         <div style="font-size:11px;color:var(--t2)">
-          Orders: <strong>${fmt(d?.totals?.total_orders || rows.length)}</strong> ·
+          Total Orders: <strong>${fmt(totalOrders)}</strong> ·
           GMV: <strong>${fmtK(d?.totals?.total_gmv || 0)}</strong> ·
           Unique users: <strong>${fmt(d?.totals?.unique_customers || 0)}</strong>
+          ${totalPages > 1 ? `<span style="color:var(--t3);margin-left:8px">Showing ${page * pageSize + 1}–${Math.min((page + 1) * pageSize, totalOrders)}</span>` : ''}
         </div>
-        <a class="fbtn sec" href="${exportUrl}" target="_blank" rel="noopener">⬇ Export CSV</a>
+        <a class="fbtn sec" href="${exportUrl}" target="_blank" rel="noopener">⬇ Export All (CSV)</a>
       </div>
-      <div class="tbl-wrap">
+      <div class="tbl-wrap" style="max-height:400px;overflow-y:auto">
         <table>
           <thead><tr><th>Order ID</th><th>Date</th><th>Name</th><th>Contact</th><th>Restaurant</th><th>Platform</th><th>Delivery</th><th>Value</th></tr></thead>
           <tbody>${tableRows || '<tr><td colspan="8" class="loading">No matching orders</td></tr>'}</tbody>
         </table>
-      </div>`;
+      </div>
+      ${paginationHtml}`;
   } catch (e) {
     el('modal-body').innerHTML = `<div class="empty"><div class="icon">⚠️</div><p>${e.message}</p></div>`;
   }
+}
+
+function drillGoToPage(page) {
+  const params = window._currentDrillParams;
+  if (params) showDrillOrders(params.title, params.extra, page);
 }
 
 function openModal(type, title) {
@@ -1923,6 +1996,8 @@ async function loadOverview() {
 }
 
 // ── TRENDS ───────────────────────────────────────────────────────────────────
+let _itemTrendsData = null;
+
 async function loadTrends() {
   startLoad();
   try {
@@ -1930,42 +2005,222 @@ async function loadTrends() {
     _modalData.monthly = ov.monthly;
     _modalData.daily   = ov.daily;
     _modalData.aovRows = aovD.rows||[];
+    _itemTrendsData = tItems;
     renderTrendsPage(ov);
-    renderAOVChart(aovD.rows||[], 'aov-svg', 640, 140);
+    renderAOVChart(aovD.rows||[], 'aov-svg', 640, 90);
     renderAOVTable(aovD.rows||[]);
     renderTrendItems(tItems);
+    populateItemTrendFilters(tItems);
   } catch(e){ console.error(e); } finally { endLoad(); }
 }
 
+// Populate month filter options based on available data
+function populateItemTrendFilters(d) {
+  const monthSet = new Set();
+  (d.topPerDay||[]).flat().forEach(r => {
+    if (r.order_date) {
+      const m = normDate(r.order_date).substring(0, 7);
+      monthSet.add(m);
+    }
+  });
+  const months = Array.from(monthSet).sort();
+  const sel = el('item-month-filter');
+  if (sel) {
+    sel.innerHTML = '<option value="">All Months</option>' + 
+      months.map(m => `<option value="${m}">${m}</option>`).join('');
+  }
+}
+
+// Apply filters to item trends
+function applyItemTrendFilters() {
+  const d = _itemTrendsData;
+  if (!d) return;
+  
+  const dateFilter = el('item-date-filter')?.value || '';
+  const monthFilter = el('item-month-filter')?.value || '';
+  
+  // Filter day data
+  let dayRows = (d.topPerDay||[]).flat();
+  if (dateFilter) {
+    dayRows = dayRows.filter(r => normDate(r.order_date) === dateFilter);
+  } else if (monthFilter) {
+    dayRows = dayRows.filter(r => normDate(r.order_date).startsWith(monthFilter));
+  }
+  
+  // Filter hour data - only show restaurant hours (7AM to midnight)
+  let hourRows = (d.topPerHour||[]).flat();
+  hourRows = hourRows.filter(r => {
+    const h = Number(r.order_hour);
+    return h >= 7 && h <= 23; // 7AM to 11PM
+  });
+  
+  // Filter best restaurant per item
+  let restRows = d.bestRestPerItem || [];
+  
+  renderFilteredTrendItems(dayRows, hourRows, restRows);
+}
+
+// Reset filters
+function resetItemTrendFilters() {
+  if (el('item-date-filter')) el('item-date-filter').value = '';
+  if (el('item-month-filter')) el('item-month-filter').value = '';
+  if (_itemTrendsData) renderTrendItems(_itemTrendsData);
+}
+
 function renderTrendItems(d){
-  const dayRows = (d.topPerDay||[]).flat().slice(0,20);
-  const maxD = Math.max(...dayRows.map(r=>Number(r.qty)||0),1);
-  html('tr-item-day', dayRows.map((r,i)=>`
-    <div class="brow">
-      <div class="blbl w200">${normDate(r.order_date)} · ${r.product_name}</div>
-      <div class="btrack"><div class="bfill ${['gr0','gr1','gr2','gr3','gr4','gr5'][i%6]}" style="width:${(r.qty/maxD*100).toFixed(0)}%;cursor:pointer" onclick="showDrillOrders('Item Orders — ${String(r.product_name||'').replace(/'/g,"\\'")}',{product_name:'${String(r.product_name||'').replace(/'/g,"\\'")}'} )">
+  // Store data globally for filtering
+  window._bestRestPerItemData = d.bestRestPerItem || [];
+  
+  // Filter to restaurant hours (7AM to midnight) by default
+  const hourRows = (d.topPerHour||[]).flat().filter(r => {
+    const h = Number(r.order_hour);
+    return h >= 7 && h <= 23;
+  }).slice(0, 25);
+  
+  const dayRows = (d.topPerDay||[]).flat().slice(0, 25);
+  const restRows = d.bestRestPerItem || [];
+  
+  // Populate restaurant filter
+  const restSet = new Set();
+  restRows.forEach(r => { if (r.restaurant_name) restSet.add(r.restaurant_name); });
+  const restFilter = el('item-rest-filter');
+  if (restFilter) {
+    restFilter.innerHTML = '<option value="">All Restaurants</option>' + 
+      Array.from(restSet).sort().map(r => `<option value="${r}">${r}</option>`).join('');
+  }
+  
+  renderFilteredTrendItems(dayRows, hourRows, restRows);
+}
+
+// Filter function for Best Restaurant per Item
+function filterBestRestPerItem() {
+  const search = (el('item-rest-search')?.value || '').toLowerCase().trim();
+  const restFilter = el('item-rest-filter')?.value || '';
+  const sortBy = el('item-rest-sort')?.value || 'qty';
+  
+  let restRows = window._bestRestPerItemData || [];
+  
+  // Apply search filter
+  if (search) {
+    restRows = restRows.filter(r => 
+      (r.product_name || '').toLowerCase().includes(search) ||
+      (r.restaurant_name || '').toLowerCase().includes(search)
+    );
+  }
+  
+  // Apply restaurant filter
+  if (restFilter) {
+    restRows = restRows.filter(r => r.restaurant_name === restFilter);
+  }
+  
+  // Group by item, show best restaurant for each
+  const itemBest = {};
+  restRows.forEach(r => {
+    const key = r.product_name;
+    const qty = Number(r.qty) || 0;
+    const existingQty = itemBest[key] ? (Number(itemBest[key].qty) || 0) : 0;
+    if (!itemBest[key] || qty > existingQty) {
+      itemBest[key] = { ...r, qty: qty };
+    }
+  });
+  
+  let sortedItems = Object.values(itemBest);
+  
+  // Apply sorting
+  if (sortBy === 'name') {
+    sortedItems.sort((a, b) => (a.product_name || '').localeCompare(b.product_name || ''));
+  } else if (sortBy === 'rest') {
+    sortedItems.sort((a, b) => (a.restaurant_name || '').localeCompare(b.restaurant_name || ''));
+  } else {
+    sortedItems.sort((a, b) => (Number(b.qty) || 0) - (Number(a.qty) || 0));
+  }
+  
+  renderBestRestPerItemTable(sortedItems.slice(0, 50));
+}
+
+function renderBestRestPerItemTable(items) {
+  const tableRows = items.map((r, i) => {
+    const productName = String(r.product_name || '').replace(/'/g, "\\'");
+    return `
+    <tr style="border-bottom:1px solid var(--bdr)">
+      <td style="padding:8px 6px">
+        <span style="font-weight:600;color:var(--t1)">${r.product_name || '—'}</span>
+      </td>
+      <td style="padding:8px 6px">
+        <span style="color:var(--blue)">${r.restaurant_name || '—'}</span>
+      </td>
+      <td class="num" style="padding:8px 6px;font-weight:700;color:var(--green)">${fmt(r.qty)}</td>
+      <td style="padding:8px 6px">
+        <button class="fbtn sec" style="font-size:9px;padding:3px 10px" onclick="showDrillOrders('Item Orders — ${productName}',{product_name:'${productName}'})">
+          👁 View
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+  
+  html('tr-item-rest', `
+    <div style="font-size:10px;color:var(--t3);margin-bottom:8px">
+      Showing ${items.length} items · Top restaurant per item by orders
+    </div>
+    <table>
+      <thead>
+        <tr style="background:var(--bg1)">
+          <th style="padding:10px 6px;text-align:left">Item Name</th>
+          <th style="padding:10px 6px;text-align:left">Best Restaurant</th>
+          <th style="padding:10px 6px;text-align:right">Orders</th>
+          <th style="padding:10px 6px;text-align:center">Action</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows || '<tr><td colspan="4" class="loading">No data</td></tr>'}</tbody>
+    </table>`);
+}
+
+function renderFilteredTrendItems(dayRows, hourRows, restRows) {
+  // Day items with improved UI
+  const maxD = Math.max(...dayRows.map(r=>Number(r.qty)||0), 1);
+  html('tr-item-day', dayRows.slice(0, 30).map((r, i) => {
+    const dateStr = normDate(r.order_date);
+    const productName = String(r.product_name || '').replace(/'/g, "\\'");
+    return `
+    <div class="brow" style="padding:6px 0;border-bottom:1px solid var(--bdr)">
+      <div class="blbl" style="width:220px;display:flex;flex-direction:column">
+        <span style="font-size:11px;font-weight:600;color:var(--t1)">${r.product_name || '—'}</span>
+        <span style="font-size:9px;color:var(--t3)">${dateStr} · ${r.restaurant_name || ''}</span>
+      </div>
+      <div class="btrack" style="flex:1"><div class="bfill ${['gr0','gr1','gr2','gr3','gr4','gr5'][i%6]}" style="width:${(r.qty/maxD*100).toFixed(0)}%;cursor:pointer;min-width:30px" onclick="showDrillOrders('Item Orders — ${productName}',{product_name:'${productName}'})">
         <span>${fmt(r.qty)}</span>
       </div></div>
-    </div>`).join('') || '<div class="loading">No item trends</div>');
+    </div>`;
+  }).join('') || '<div class="empty" style="padding:20px;text-align:center;color:var(--t3)">No item data for selected filter</div>');
 
-  const hourRows = (d.topPerHour||[]).flat().slice(0,20);
-  const maxH = Math.max(...hourRows.map(r=>Number(r.qty)||0),1);
-  html('tr-item-hour', hourRows.map((r,i)=>`
-    <div class="brow">
-      <div class="blbl w200">${String(r.order_hour).padStart(2,'0')}:00 · ${r.product_name}</div>
-      <div class="btrack"><div class="bfill ${['gr2','gr3','gr4','gr5','gr0','gr1'][i%6]}" style="width:${(r.qty/maxH*100).toFixed(0)}%">
+  // Hour items with 12-hour format
+  const maxH = Math.max(...hourRows.map(r=>Number(r.qty)||0), 1);
+  html('tr-item-hour', hourRows.slice(0, 30).map((r, i) => {
+    const h = Number(r.order_hour);
+    const hourLabel = h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h-12} PM`;
+    return `
+    <div class="brow" style="padding:5px 0;border-bottom:1px solid var(--bdr)">
+      <div class="blbl" style="width:180px;display:flex;flex-direction:column">
+        <span style="font-size:11px;font-weight:600;color:var(--t1)">${r.product_name || '—'}</span>
+        <span style="font-size:9px;color:var(--orange)">${hourLabel}</span>
+      </div>
+      <div class="btrack" style="flex:1"><div class="bfill ${['gr2','gr3','gr4','gr5','gr0','gr1'][i%6]}" style="width:${(r.qty/maxH*100).toFixed(0)}%;min-width:25px">
         <span>${fmt(r.qty)}</span>
       </div></div>
-    </div>`).join('') || '<div class="loading">No hourly item trends</div>');
+    </div>`;
+  }).join('') || '<div class="empty" style="padding:20px;text-align:center;color:var(--t3)">No hourly data</div>');
 
-  const restRows = (d.bestRestPerItem||[]).slice(0,30).map(r=>`
-    <tr>
-      <td>${r.product_name||'—'}</td>
-      <td>${r.restaurant_name||'—'}</td>
-      <td class="num">${fmt(r.qty)}</td>
-      <td><button class="fbtn sec" style="font-size:10px;padding:2px 8px" onclick="showDrillOrders('Item Orders — ${String(r.product_name||'').replace(/'/g,"\\'")}',{product_name:'${String(r.product_name||'').replace(/'/g,"\\'")}'} )">View</button></td>
-    </tr>`).join('');
-  html('tr-item-rest', `<table><thead><tr><th>Item</th><th>Top Restaurant</th><th>Orders</th><th>Detail</th></tr></thead><tbody>${restRows||'<tr><td colspan="4" class="loading">No data</td></tr>'}</tbody></table>`);
+  // Best restaurant per item - use the new function
+  // Group by item first, show top restaurant for each
+  const itemBest = {};
+  restRows.forEach(r => {
+    const key = r.product_name;
+    if (!itemBest[key] || r.qty > itemBest[key].qty) {
+      itemBest[key] = r;
+    }
+  });
+  const sortedItems = Object.values(itemBest).sort((a, b) => b.qty - a.qty).slice(0, 50);
+  renderBestRestPerItemTable(sortedItems);
 }
 
 function renderTrendsPage(ov) {

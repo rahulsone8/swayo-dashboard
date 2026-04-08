@@ -58,13 +58,17 @@ const poolConfig = process.env.MYSQL_URL || process.env.DATABASE_URL
   ? { uri: process.env.MYSQL_URL || process.env.DATABASE_URL,
       waitForConnections: true, connectionLimit: 10,
       ssl: { rejectUnauthorized: false } }
-  : { host: process.env.DB_HOST || "localhost",
-      port: Number(process.env.DB_PORT) || 3306,
-      user: process.env.DB_USER || "root",
-      password: process.env.DB_PASS || "Rahul1975",
-      database: process.env.DB_NAME || "funnel_pipeline",
+  : { host: process.env.DB_HOST,
+      port: Number(process.env.DB_PORT),
+      user: process.env.DB_USER,
+      password: process.env.DB_PASS,
+      database: process.env.DB_NAME,
       waitForConnections: true, connectionLimit: 10,
       ...(process.env.DB_SSL === "true" ? { ssl: { rejectUnauthorized: false } } : {}) };
+
+if (!poolConfig.uri && (!poolConfig.host || !poolConfig.user || !poolConfig.password || !poolConfig.database)) {
+  throw new Error('Missing required database configuration. Please set environment variables: DB_HOST, DB_USER, DB_PASS, DB_NAME');
+}
 
 const pool = mysql.createPool(poolConfig);
 
@@ -491,6 +495,33 @@ app.get("/api/funnel", async (req, res) => {
       GROUP BY ff.shop_id, r.restaurant_name
       ORDER BY total_events DESC LIMIT 10`, fv);
 
+    const byRestaurantMonthly = await q(`
+      SELECT DATE_FORMAT(ff.event_date, '%Y-%m') AS month_key,
+             ff.shop_id,
+             COALESCE(r.restaurant_name, ff.shop_id) AS restaurant_name,
+             COUNT(*) AS total_events,
+             SUM(CASE WHEN action='VIEW_CART' THEN 1 ELSE 0 END) AS view_cart,
+             SUM(CASE WHEN action='CHECKOUT'  THEN 1 ELSE 0 END) AS checkout,
+             SUM(CASE WHEN action='ORDER'     THEN 1 ELSE 0 END) AS orders,
+             COUNT(DISTINCT ff.customer_contact) AS unique_customers
+      FROM fact_funnel ff
+      LEFT JOIN dim_restaurants r ON r.shop_id = ff.shop_id
+      WHERE ${fWhere}
+      GROUP BY month_key, ff.shop_id, r.restaurant_name
+      ORDER BY month_key DESC, total_events DESC`, fv);
+
+    const byRestaurantDaily = await q(`
+      SELECT ff.shop_id,
+             COALESCE(r.restaurant_name, ff.shop_id) AS restaurant_name,
+             ff.event_date,
+             ff.action,
+             COUNT(*) AS total
+      FROM fact_funnel ff
+      LEFT JOIN dim_restaurants r ON r.shop_id = ff.shop_id
+      WHERE ${fWhere}
+      GROUP BY ff.shop_id, r.restaurant_name, ff.event_date, ff.action
+      ORDER BY ff.event_date DESC`, fv);
+
     // Drop-off cohorts (single pass, faster than NOT IN subqueries)
     const dropoffAgg = await q(`
       SELECT ff.customer_contact,
@@ -527,7 +558,7 @@ app.get("/api/funnel", async (req, res) => {
              ROUND(AVG(overall_conversion_rate),2) AS overall_conversion_rate
       FROM agg_funnel_conversion WHERE ${fWhere}`, fv);
 
-    res.json({ stages, weeklyTrend, hourly, topShops, cartNoCheckout, checkoutNoOrder, conversion: conv || {} });
+    res.json({ stages, weeklyTrend, hourly, topShops, byRestaurantMonthly, byRestaurantDaily, cartNoCheckout, checkoutNoOrder, conversion: conv || {} });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -571,6 +602,27 @@ app.get("/api/funnel_wa", async (req, res) => {
       FROM fact_funnel_wa WHERE ${fWhere}
       GROUP BY restaurant_name, shop_id ORDER BY orders DESC`, fv);
 
+    const byRestaurantMonthly = await q(`
+      SELECT DATE_FORMAT(event_date, '%Y-%m') AS month_key,
+             restaurant_name, shop_id,
+             SUM(CASE WHEN action='VIEW_CATALOG' THEN 1 ELSE 0 END) AS view_catalog,
+             SUM(CASE WHEN action='VIEW_CART'    THEN 1 ELSE 0 END) AS view_cart,
+             SUM(CASE WHEN action='CHECKOUT'     THEN 1 ELSE 0 END) AS checkout,
+             SUM(CASE WHEN action='ORDER'        THEN 1 ELSE 0 END) AS orders,
+             COUNT(DISTINCT customer_contact) AS unique_customers,
+             ROUND(SUM(CASE WHEN action='ORDER' THEN 1 ELSE 0 END)*100.0/
+               NULLIF(SUM(CASE WHEN action='VIEW_CART' THEN 1 ELSE 0 END),0),1) AS cart_to_order_pct
+      FROM fact_funnel_wa WHERE ${fWhere}
+      GROUP BY month_key, restaurant_name, shop_id
+      ORDER BY month_key DESC, orders DESC`, fv);
+
+    const byRestaurantDaily = await q(`
+      SELECT shop_id, restaurant_name, event_date, action, COUNT(*) AS total
+      FROM fact_funnel_wa
+      WHERE ${fWhere}
+      GROUP BY shop_id, restaurant_name, event_date, action
+      ORDER BY event_date DESC`, fv);
+
     // Hourly
     const hourly = await q(`
       SELECT event_hour, action, COUNT(*) AS total
@@ -613,7 +665,7 @@ app.get("/api/funnel_wa", async (req, res) => {
       ...r
     }));
 
-    res.json({ stages, weeklyTrend, hourly, byRestaurant, byCampaign: byCampaignNamed, cartNoCheckout, checkoutNoOrder });
+    res.json({ stages, weeklyTrend, hourly, byRestaurant, byRestaurantMonthly, byRestaurantDaily, byCampaign: byCampaignNamed, cartNoCheckout, checkoutNoOrder });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

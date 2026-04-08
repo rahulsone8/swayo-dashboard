@@ -31,7 +31,8 @@ build/
 *.tmp
 .cache/
 
-# Presentation files
-SWAYO_DASHBOARD_PRESENTATION.md
-generate-pptx.js
-SWAYO_DASHBOARD_PRESENTATION.pptx
+#files
+public/styles.css.backup
+public/dashboard.html.bak.1775487048
+server.js.bak.1775487048
+tempCodeRunnerFile.js

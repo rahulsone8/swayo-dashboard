@@ -1,6 +1,27 @@
 // ── CONFIG ────────────────────────────────────────────────────────────────
 const API = window.location.origin;
 
+// ── THEME TOGGLE ───────────────────────────────────────────────────────────
+function initTheme() {
+  const saved = localStorage.getItem('swayo-theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = saved || (prefersDark ? 'dark' : 'light');
+  applyTheme(theme);
+}
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('swayo-theme', theme);
+  const icon = document.getElementById('theme-icon');
+  const label = document.getElementById('theme-label');
+  if (icon) icon.textContent = theme === 'dark' ? '🌙' : '☀️';
+  if (label) label.textContent = theme === 'dark' ? 'Dark' : 'Light';
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+}
+initTheme();
+
 // ── PLATFORM VALUES (exact from pipeline v5.1) ────────────────────────────
 const PLAT = {
   gf_whatsapp:    'GrabFood WhatsApp',
@@ -13,12 +34,12 @@ const PCOL = {
   swayo_app:      '#3b82f6',
 };
 const SCOL = { VIP:'#ef4444', Loyal:'#f59e0b', Repeat:'#3b82f6', 'One-time':'#8b5cf6' };
-const SBGC = { VIP:'rgba(239,68,68,.09)', Loyal:'rgba(245,158,11,.09)', Repeat:'rgba(59,130,246,.09)', 'One-time':'rgba(139,92,246,.09)' };
+const SBGC = { VIP:'rgba(239,68,68,.12)', Loyal:'rgba(245,158,11,.12)', Repeat:'rgba(59,130,246,.12)', 'One-time':'rgba(139,92,246,.12)' };
 const COLORS = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec4899'];
 const GR = [
   'linear-gradient(90deg,#3b82f6,#60a5fa)','linear-gradient(90deg,#10b981,#34d399)',
   'linear-gradient(90deg,#8b5cf6,#a78bfa)','linear-gradient(90deg,#f59e0b,#fbbf24)',
-  'linear-gradient(90deg,#ef4444,#f87171)','linear-gradient(90deg,#06b6d4,#38bdf8)',
+  'linear-gradient(90deg,#ef4444,#f87171)','linear-gradient(90deg,#06b6d4,#22d3ee)',
   'linear-gradient(90deg,#ec4899,#f472b6)',
 ];
 
@@ -67,6 +88,160 @@ const fmtDTStr = v => {
   const {date,time} = fmtDT(v);
   return time && time !== '—' ? `${date} ${time}` : date;
 };
+let _appDropUsers = [];
+let _waDropUsers = [];
+
+// ── TOOLTIP SYSTEM ─────────────────────────────────────────────────────────
+let tooltipEl = null;
+let tooltipActive = false;
+let _appDropStage = 'all';
+let _waDropStage = 'all';
+let _fnHourlyRaw = [];
+let _waHourlyRaw = [];
+let _fnRestDailyRaw = [];
+let _waRestDailyRaw = [];
+function initTooltip() {
+  if (tooltipEl) return;
+  tooltipEl = document.createElement('div');
+  tooltipEl.className = 'tooltip';
+  tooltipEl.innerHTML = '<div class="tooltip-content"></div>';
+  document.body.appendChild(tooltipEl);
+  document.addEventListener('mousemove', (e) => {
+    if (tooltipActive) positionTooltip(e);
+  }, { passive: true });
+  document.addEventListener('mousedown', hideTooltip, { passive: true });
+  window.addEventListener('scroll', hideTooltip, { passive: true });
+}
+function showTooltip(e, content) {
+  initTooltip();
+  tooltipEl.querySelector('.tooltip-content').innerHTML = content;
+  tooltipActive = true;
+  tooltipEl.classList.add('visible');
+  positionTooltip(e);
+}
+function hideTooltip() {
+  tooltipActive = false;
+  if (tooltipEl) tooltipEl.classList.remove('visible');
+}
+function positionTooltip(e) {
+  if (!tooltipEl) return;
+  const rect = tooltipEl.getBoundingClientRect();
+  let x = e.clientX + 12;
+  let y = e.clientY + 12;
+  if (x + rect.width > window.innerWidth - 10) x = e.clientX - rect.width - 12;
+  if (y + rect.height > window.innerHeight - 10) y = e.clientY - rect.height - 12;
+  tooltipEl.style.left = x + 'px';
+  tooltipEl.style.top = y + 'px';
+}
+
+function renderAppDropUsers() {
+  const rows = _appDropUsers.filter(r => {
+    const stageOk = _appDropStage === 'all'
+      || (_appDropStage === 'cart' && r.stage === 'Cart→No Checkout')
+      || (_appDropStage === 'checkout' && r.stage === 'Checkout→No Order');
+    return !!stageOk;
+  });
+  const htmlRows = rows.map(r=>`<tr><td>${r.stage}</td><td>${normDate(r.last_seen||r.event_date)||'—'}</td><td>${r.customer_name||'—'}</td><td class="mono">${r.customer_contact||'—'}</td><td>${r.restaurant_name||'—'}</td></tr>`).join('');
+  html('fn-drop-users', `<table><thead><tr><th>Stage</th><th>Date</th><th>Name</th><th>Contact</th><th>Restaurant</th></tr></thead><tbody>${htmlRows||'<tr><td colspan="5" class="loading">No drop-off users</td></tr>'}</tbody></table>`);
+}
+
+function renderWADropUsers() {
+  const rows = _waDropUsers.filter(r => {
+    const stageOk = _waDropStage === 'all'
+      || (_waDropStage === 'cart' && r.stage === 'Cart→No Checkout')
+      || (_waDropStage === 'checkout' && r.stage === 'Checkout→No Order');
+    return !!stageOk;
+  });
+  const htmlRows = rows.map(r=>`<tr><td>${r.stage}</td><td>${normDate(r.last_seen||r.event_date)||'—'}</td><td>${r.customer_name||'—'}</td><td class="mono">${r.customer_contact||'—'}</td><td>${r.restaurant_name||'—'}</td></tr>`).join('');
+  html('wa-drop-users', `<table><thead><tr><th>Stage</th><th>Date</th><th>Name</th><th>Contact</th><th>Restaurant</th></tr></thead><tbody>${htmlRows||'<tr><td colspan="5" class="loading">No drop-off users</td></tr>'}</tbody></table>`);
+}
+
+function exportDropUsers(kind='app') {
+  const rows = kind === 'wa' ? _waDropUsers : _appDropUsers;
+  if (!rows.length) return;
+  const header = ['stage','date','customer_name','customer_contact','restaurant_name'];
+  const esc = (v)=>`"${String(v??'').replace(/"/g,'""')}"`;
+  const csv = [header.join(','), ...rows.map(r => [r.stage,normDate(r.last_seen||r.event_date||''),r.customer_name,r.customer_contact,r.restaurant_name].map(esc).join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = kind === 'wa' ? 'wa_drop_users.csv' : 'app_drop_users.csv';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 500);
+}
+
+function setDropStage(kind='app', stage='all') {
+  if (kind === 'wa') {
+    _waDropStage = stage;
+    const wrap = el('wa-drop-stage-chips');
+    if (wrap) [...wrap.querySelectorAll('.drop-chip')].forEach((b,i)=>{
+      const key = ['all','cart','checkout'][i];
+      b.classList.toggle('active', key === stage);
+    });
+    renderWADropUsers();
+    return;
+  }
+  _appDropStage = stage;
+  const wrap = el('fn-drop-stage-chips');
+  if (wrap) [...wrap.querySelectorAll('.drop-chip')].forEach((b,i)=>{
+    const key = ['all','cart','checkout'][i];
+    b.classList.toggle('active', key === stage);
+  });
+  renderAppDropUsers();
+}
+function hourOption(h){ return `${String(h).padStart(2,'0')}:00`; }
+
+function renderFunnelHourBars() {
+  const byHour={};
+  (_fnHourlyRaw||[]).forEach(r=>{
+    const k = Number(r.event_hour);
+    if (Number.isNaN(k)) return;
+    byHour[k]=(byHour[k]||0)+Number(r.total||0);
+  });
+  const hourRows=Object.entries(byHour).sort((a,b)=>Number(a[0])-Number(b[0]));
+  const maxH=Math.max(...hourRows.map(x=>x[1]),1);
+  html('fn-hourly', hourRows.map((x,i)=>`<div class="brow"><div class="blbl w120">${hourOption(x[0])}</div><div class="btrack"><div class="bfill ${['gr0','gr1','gr2','gr3'][i%4]}" style="width:${(x[1]/maxH*100).toFixed(0)}%"><span>${fmt(x[1])}</span></div></div></div>`).join('') || '<div class="loading">No hourly data</div>');
+}
+
+function renderWAFunnelHourBars() {
+  const byHour={};
+  (_waHourlyRaw||[]).forEach(r=>{
+    const k = Number(r.event_hour);
+    if (Number.isNaN(k)) return;
+    byHour[k]=(byHour[k]||0)+Number(r.total||0);
+  });
+  const hourRows=Object.entries(byHour).sort((a,b)=>Number(a[0])-Number(b[0]));
+  const maxH=Math.max(...hourRows.map(x=>x[1]),1);
+  html('wa-fn-hourly', hourRows.map((x,i)=>`<div class="brow"><div class="blbl w120">${hourOption(x[0])}</div><div class="btrack"><div class="bfill ${['gr0','gr1','gr2','gr3'][i%4]}" style="width:${(x[1]/maxH*100).toFixed(0)}%"><span>${fmt(x[1])}</span></div></div></div>`).join('') || '<div class="loading">No hourly data</div>');
+}
+
+function renderRestaurantComparison(kind='app') {
+  const raw = kind === 'wa' ? _waRestDailyRaw : _fnRestDailyRaw;
+  const tgt = kind === 'wa' ? 'wa-rest-compare' : 'fn-rest-compare';
+  if (!el(tgt)) return;
+  if (!raw?.length) { html(tgt, '<div class="loading">No comparison data</div>'); return; }
+  const byRest = {};
+  raw.forEach(r=>{
+    const key = r.restaurant_name || r.shop_id || '—';
+    const d = normDate(r.event_date);
+    if (!byRest[key]) byRest[key] = {};
+    if (!byRest[key][d]) byRest[key][d] = {};
+    byRest[key][d][r.action] = (byRest[key][d][r.action]||0) + Number(r.total||0);
+  });
+  const rows = Object.entries(byRest).slice(0,30).map(([name, dayMap])=>{
+    const dates = Object.keys(dayMap).sort((a,b)=>b.localeCompare(a));
+    const cur = dates[0], prev = dates[1];
+    if (!cur || !prev) return '';
+    const curVC = Number(dayMap[cur]?.VIEW_CART||0), prevVC = Number(dayMap[prev]?.VIEW_CART||0);
+    const curOrd = Number(dayMap[cur]?.ORDER||0), prevOrd = Number(dayMap[prev]?.ORDER||0);
+    const wkCmp = prevVC ? (((curVC-prevVC)/prevVC)*100).toFixed(1) : '—';
+    const ordCmp = prevOrd ? (((curOrd-prevOrd)/prevOrd)*100).toFixed(1) : '—';
+    const wkClass = (wkCmp !== '—' && Number(wkCmp) < 0) ? 'bad' : 'hi';
+    const ordClass = (ordCmp !== '—' && Number(ordCmp) < 0) ? 'bad' : 'hi';
+    return `<tr><td>${name}</td><td>${cur||'—'}</td><td class="num">${fmt(curVC)}</td><td class="num ${wkClass}">${wkCmp==='—'?'—':wkCmp+'%'}</td><td class="num">${fmt(curOrd)}</td><td class="num ${ordClass}">${ordCmp==='—'?'—':ordCmp+'%'}</td></tr>`;
+  }).filter(Boolean).join('');
+  html(tgt, `<table><thead><tr><th>Restaurant</th><th>Latest Day</th><th>View Cart</th><th>vs Prev Day</th><th>Orders</th><th>vs Prev Day</th></tr></thead><tbody>${rows||'<tr><td colspan="6" class="loading">No comparison data</td></tr>'}</tbody></table>`);
+}
 
 // ── LOADING STATE ──────────────────────────────────────────────────────────
 let _loading = 0;
@@ -420,29 +595,38 @@ function renderTrendSVG(monthly, svgId, W=640, H=140) {
   const polyG=pts.map(p=>`${p.x.toFixed(1)},${p.yG.toFixed(1)}`).join(' ');
   const polyO=pts.map(p=>`${p.x.toFixed(1)},${p.yO.toFixed(1)}`).join(' ');
   const fill=polyG+` ${pts[pts.length-1].x.toFixed(1)},${H-pB} ${pts[0].x.toFixed(1)},${H-pB}`;
+  
   const grid=[.25,.5,.75,1].map(f=>{
     const y=(pT+(1-f)*(H-pT-pB)).toFixed(1);
     return `<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" stroke="var(--bdr)" stroke-width="1"/>
             <text x="${pL-4}" y="${+y+3}" text-anchor="end" fill="var(--t3)" font-size="9">${fmtK(maxG*f)}</text>`;
   }).join('');
-  const dots=pts.map(p=>`
-    <circle cx="${p.x.toFixed(1)}" cy="${p.yG.toFixed(1)}" r="4.5" fill="var(--blue)" stroke="var(--bg2)" stroke-width="2"/>
-    <text x="${p.x.toFixed(1)}" y="${(p.yG-8).toFixed(1)}" text-anchor="middle" fill="var(--blue)" font-size="8.5" font-weight="700">${fmtK(p.m.gmv)}</text>
-    <circle cx="${p.x.toFixed(1)}" cy="${p.yO.toFixed(1)}" r="3" fill="var(--orange)"/>
-    <text x="${p.x.toFixed(1)}" y="${H-pB+15}" text-anchor="middle" fill="var(--t3)" font-size="9">${p.m.month_key}</text>`).join('');
+  
+  const dots=pts.map(p=>{
+    const gmvLabelY = p.yG <= (pT + 14) ? (p.yG + 14) : (p.yG - 10);
+    return `
+    <circle cx="${p.x.toFixed(1)}" cy="${p.yG.toFixed(1)}" r="5" fill="var(--blue)" stroke="var(--bg2)" stroke-width="2"/>
+    <text x="${p.x.toFixed(1)}" y="${gmvLabelY.toFixed(1)}" text-anchor="middle" fill="var(--blue)" font-size="9" font-weight="700">${fmtK(p.m.gmv)}</text>
+    <circle cx="${p.x.toFixed(1)}" cy="${p.yO.toFixed(1)}" r="4" fill="var(--orange)"/>
+    <text x="${p.x.toFixed(1)}" y="${H-pB+15}" text-anchor="middle" fill="var(--t3)" font-size="9">${p.m.month_key}</text>`;
+  }).join('');
+  
   svgEl.setAttribute('viewBox',`0 0 ${W} ${H+10}`);
-  svgEl.innerHTML=`<defs><linearGradient id="gBlue" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0%" stop-color="#3b82f6" stop-opacity=".25"/>
-    <stop offset="100%" stop-color="#3b82f6" stop-opacity=".01"/>
-  </linearGradient></defs>
-  ${grid}<polygon points="${fill}" fill="url(#gBlue)"/>
-  <polyline points="${polyG}" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linejoin="round"/>
-  <polyline points="${polyO}" fill="none" stroke="var(--orange)" stroke-width="1.5" stroke-dasharray="4,3"/>
+  svgEl.innerHTML=`<defs>
+    <linearGradient id="gBlue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="var(--blue)" stop-opacity=".25"/>
+      <stop offset="100%" stop-color="var(--blue)" stop-opacity=".02"/>
+    </linearGradient>
+  </defs>
+  ${grid}
+  <polygon points="${fill}" fill="url(#gBlue)"/>
+  <polyline points="${polyG}" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <polyline points="${polyO}" fill="none" stroke="var(--orange)" stroke-width="2" stroke-dasharray="6,4"/>
   ${dots}
-  <rect x="${pL}" y="${H-pB+24}" width="10" height="2.5" fill="var(--blue)" rx="1"/>
-  <text x="${pL+14}" y="${H-pB+28}" fill="var(--t3)" font-size="8.5">GMV</text>
-  <line x1="${pL+45}" y1="${H-pB+26}" x2="${pL+55}" y2="${H-pB+26}" stroke="var(--orange)" stroke-width="1.5" stroke-dasharray="4,2"/>
-  <text x="${pL+59}" y="${H-pB+28}" fill="var(--t3)" font-size="8.5">Orders</text>`;
+  <rect x="${pL}" y="${H-pB+24}" width="12" height="3" fill="var(--blue)" rx="1.5"/>
+  <text x="${pL+16}" y="${H-pB+28}" fill="var(--t2)" font-size="9">GMV</text>
+  <line x1="${pL+50}" y1="${H-pB+26}" x2="${pL+62}" y2="${H-pB+26}" stroke="var(--orange)" stroke-width="2" stroke-dasharray="4,2"/>
+  <text x="${pL+66}" y="${H-pB+28}" fill="var(--t2)" font-size="9">Orders</text>`;
 }
 
 function renderMoMChart(monthly, svgId, W=720, H=160) {
@@ -452,9 +636,7 @@ function renderMoMChart(monthly, svgId, W=720, H=160) {
   const bars=monthly.map((m,i)=>{
     const bh=Math.max(((m.orders/maxO)*(H-pT-pB)).toFixed(0),2);
     const x=pL+i*bw, col=COLORS[i%COLORS.length];
-    return `<rect x="${(x+2).toFixed(0)}" y="${H-pB-bh}" width="${Math.max(bw-4,2).toFixed(0)}" height="${bh}" fill="${col}" rx="2" opacity=".85">
-      <title>${m.month_key} — ${fmt(m.orders)} orders</title></rect>
-      <text x="${(x+bw/2).toFixed(0)}" y="${H-pB-bh-4}" text-anchor="middle" fill="${col}" font-size="8.5" font-weight="700">${fmt(m.orders)}</text>
+    return `<rect x="${(x+2).toFixed(0)}" y="${H-pB-bh}" width="${Math.max(bw-4,2).toFixed(0)}" height="${bh}" fill="${col}" rx="2" opacity=".85" style="cursor:pointer" data-kpi-tip="${m.month_key} • ${fmt(m.orders)} orders"></rect>
       <text x="${(x+bw/2).toFixed(0)}" y="${H-pB+14}" text-anchor="middle" fill="var(--t3)" font-size="8.5">${m.month_key}</text>`;
   }).join('');
   const grid=[.25,.5,.75,1].map(f=>{
@@ -464,6 +646,11 @@ function renderMoMChart(monthly, svgId, W=720, H=160) {
   }).join('');
   svgEl.setAttribute('viewBox',`0 0 ${W} ${H}`);
   svgEl.innerHTML=grid+bars;
+  svgEl.querySelectorAll('rect[data-kpi-tip]').forEach(node=>{
+    node.addEventListener('mouseenter', e=>showTooltip(e, `<div class="tooltip-title">${node.getAttribute('data-kpi-tip')}</div>`));
+    node.addEventListener('mousemove', positionTooltip);
+    node.addEventListener('mouseleave', hideTooltip);
+  });
 }
 
 function renderDoDChart(daily, svgId, W=800, H=110) {
@@ -476,8 +663,7 @@ function renderDoDChart(daily, svgId, W=800, H=110) {
     const x=pL+i*bw;
     const isMax=d.orders===maxO;
     const dateKey = normDate(d.order_date);
-    return `<rect x="${x.toFixed(1)}" y="${H-pB-bh}" width="${Math.max(bw-0.5,0.3).toFixed(1)}" height="${bh}" fill="${isMax?'var(--green)':'var(--blue)'}" rx="0.5" opacity=".75" style="cursor:pointer" onclick="showDrillOrders('Orders — ${dateKey}',{order_date:'${dateKey}'})">
-      <title>${dateKey} (${d.dow||''}) — ${fmt(d.orders)} orders · ${fmtK(d.gmv)}</title></rect>`;
+    return `<rect x="${x.toFixed(1)}" y="${H-pB-bh}" width="${Math.max(bw-0.5,0.3).toFixed(1)}" height="${bh}" fill="${isMax?'var(--green)':'var(--blue)'}" rx="0.5" opacity=".75" style="cursor:pointer" data-kpi-tip="${dateKey} • ${fmt(d.orders)} orders · ${fmtK(d.gmv)}" onclick="showDrillOrders('Orders — ${dateKey}',{order_date:'${dateKey}'})"></rect>`;
   }).join('');
   const months={};
   daily.forEach((d,i)=>{ const m=normDate(d.order_date).substr(0,7); if(!months[m]) months[m]=i; });
@@ -487,6 +673,11 @@ function renderDoDChart(daily, svgId, W=800, H=110) {
   }).join('');
   svgEl.setAttribute('viewBox',`0 0 ${W} ${H}`);
   svgEl.innerHTML=bars+xlbl+`<text x="${pL}" y="10" fill="var(--green)" font-size="8">▮ peak day</text>`;
+  svgEl.querySelectorAll('rect[data-kpi-tip]').forEach(node=>{
+    node.addEventListener('mouseenter', e=>showTooltip(e, `<div class="tooltip-title sm">${node.getAttribute('data-kpi-tip')}</div>`));
+    node.addEventListener('mousemove', positionTooltip);
+    node.addEventListener('mouseleave', hideTooltip);
+  });
 }
 
 function renderDailyChart(daily, dailyByPlatform, svgId, legId, W=800, H=95) {
@@ -506,29 +697,39 @@ function renderDailyChart(daily, dailyByPlatform, svgId, legId, W=800, H=95) {
     const x=pL+i*bw;
     const pd=platByDate[d.order_date]||{};
     const total=d.orders;
-    // Stacked bars
+    // Stacked bars with rounded tops
     let y=H-pB, out='';
     const order=['swayo_app','gf_whatsapp','swayo_whatsapp'];
+    const segments=[];
     order.forEach(plat=>{
       const cnt=pd[plat]||0; if(!cnt) return;
       const ph=Math.max(((cnt/maxO)*(H-pT-pB)).toFixed(0),0.5);
-      out+=`<rect x="${x.toFixed(1)}" y="${(y-ph).toFixed(1)}" width="${Math.max(bw-0.5,0.3).toFixed(1)}" height="${ph.toFixed(1)}" fill="${PCOL[plat]||'#999'}" opacity=".85" style="cursor:pointer" onclick="showDrillOrders('Orders — ${d.order_date} (${PLAT[plat]||plat})',{order_date:'${d.order_date}',platform:'${plat}'})">
-        <title>${d.order_date} ${PLAT[plat]||plat}: ${fmt(cnt)} orders</title></rect>`;
+      segments.push({plat,cnt,ph,y:y-ph});
       y-=ph;
+    });
+    segments.reverse().forEach((s,idx)=>{
+      const rx=idx===0?'3':'0';
+      const dKey = normDate(d.order_date);
+      out+=`<rect x="${x.toFixed(1)}" y="${s.y.toFixed(1)}" width="${Math.max(bw-1,1).toFixed(1)}" height="${s.ph.toFixed(1)}" fill="${PCOL[s.plat]||'#999'}" rx="${rx}" style="cursor:pointer" data-kpi-tip="${dKey} • ${PLAT[s.plat]||s.plat}: ${fmt(s.cnt)} orders" onclick="showDrillOrders('Orders — ${dKey} (${PLAT[s.plat]||s.plat})',{order_date:'${dKey}',platform:'${s.plat}'})"></rect>`;
     });
     return out;
   }).join('');
 
   const months={};
   daily.forEach((d,i)=>{ const m=String(d.order_date).substr(0,7); if(!months[m]) months[m]=i; });
-  const xlbl=Object.entries(months).map(([m,i])=>`<text x="${(pL+i*bw).toFixed(0)}" y="${H-pB+14}" fill="var(--t3)" font-size="8">${m}</text>`).join('');
+  const xlbl=Object.entries(months).map(([m,i])=>`<text x="${(pL+i*bw).toFixed(0)}" y="${H-pB+14}" fill="var(--t2)" font-size="9" font-weight="500">${m}</text>`).join('');
 
   svgEl.setAttribute('viewBox',`0 0 ${W} ${H}`);
   svgEl.innerHTML=bars+xlbl;
+  svgEl.querySelectorAll('rect[data-kpi-tip]').forEach(node=>{
+    node.addEventListener('mouseenter', e=>showTooltip(e, `<div class="tooltip-title sm">${node.getAttribute('data-kpi-tip')}</div>`));
+    node.addEventListener('mousemove', positionTooltip);
+    node.addEventListener('mouseleave', hideTooltip);
+  });
 
   if(legEl) legEl.innerHTML=Object.entries(PLAT).map(([k,v])=>`
-    <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--t2)">
-      <div style="width:10px;height:10px;border-radius:2px;background:${PCOL[k]}"></div>${v}
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t2);font-weight:500">
+      <div style="width:12px;height:12px;border-radius:3px;background:${PCOL[k]}"></div>${v}
     </div>`).join('');
 }
 
@@ -543,10 +744,13 @@ function renderAOVChart(rows, svgId, W=640, H=130) {
   const pts=months.map((m,i)=>({x:pL+i*xS, y:pT+(1-m.aovF/maxA)*(H-pT-pB), m}));
   const poly=pts.map(p=>`${p.x.toFixed(0)},${p.y.toFixed(0)}`).join(' ');
   const fill=poly+` ${pts[pts.length-1].x},${H-pB} ${pts[0].x},${H-pB}`;
-  const dots=pts.map(p=>`
+  const dots=pts.map(p=>{
+    const valY = p.y <= (pT + 14) ? (p.y + 14) : (p.y - 8);
+    return `
     <circle cx="${p.x.toFixed(0)}" cy="${p.y.toFixed(0)}" r="4" fill="var(--green)" stroke="var(--bg2)" stroke-width="1.5"/>
-    <text x="${p.x.toFixed(0)}" y="${(p.y-8).toFixed(0)}" text-anchor="middle" fill="var(--green)" font-size="8.5" font-weight="700">${fmtR(p.m.aovF)}</text>
-    <text x="${p.x.toFixed(0)}" y="${H-pB+15}" text-anchor="middle" fill="var(--t3)" font-size="8.5">${p.m.k}</text>`).join('');
+    <text x="${p.x.toFixed(0)}" y="${valY.toFixed(0)}" text-anchor="middle" fill="var(--green)" font-size="8.5" font-weight="700">${fmtR(p.m.aovF)}</text>
+    <text x="${p.x.toFixed(0)}" y="${H-pB+15}" text-anchor="middle" fill="var(--t3)" font-size="8.5">${p.m.k}</text>`;
+  }).join('');
   const grid=[.5,1].map(f=>{
     const y=(pT+(1-f)*(H-pT-pB)).toFixed(0);
     return `<line x1="${pL}" y1="${y}" x2="${W-pR}" y2="${y}" stroke="var(--bdr)" stroke-width="1"/>
@@ -568,10 +772,13 @@ function renderUniqChart(monthly, svgId, W=640, H=120) {
   const pts=monthly.map((m,i)=>({x:pL+i*xS, y:pT+(1-m.unique_customers/maxU)*(H-pT-pB), m}));
   const poly=pts.map(p=>`${p.x.toFixed(0)},${p.y.toFixed(0)}`).join(' ');
   const fill=poly+` ${pts[pts.length-1].x},${H-pB} ${pts[0].x},${H-pB}`;
-  const dots=pts.map(p=>`
+  const dots=pts.map(p=>{
+    const valY = p.y <= (pT + 14) ? (p.y + 14) : (p.y - 8);
+    return `
     <circle cx="${p.x.toFixed(0)}" cy="${p.y.toFixed(0)}" r="4" fill="var(--purple)" stroke="var(--bg2)" stroke-width="1.5"/>
-    <text x="${p.x.toFixed(0)}" y="${(p.y-8).toFixed(0)}" text-anchor="middle" fill="var(--purple)" font-size="8.5" font-weight="700">${fmt(p.m.unique_customers)}</text>
-    <text x="${p.x.toFixed(0)}" y="${H-pB+15}" text-anchor="middle" fill="var(--t3)" font-size="8.5">${p.m.month_key}</text>`).join('');
+    <text x="${p.x.toFixed(0)}" y="${valY.toFixed(0)}" text-anchor="middle" fill="var(--purple)" font-size="8.5" font-weight="700">${fmt(p.m.unique_customers)}</text>
+    <text x="${p.x.toFixed(0)}" y="${H-pB+15}" text-anchor="middle" fill="var(--t3)" font-size="8.5">${p.m.month_key}</text>`;
+  }).join('');
   svgEl.setAttribute('viewBox',`0 0 ${W} ${H}`);
   svgEl.innerHTML=`<defs><linearGradient id="gPurp" x1="0" y1="0" x2="0" y2="1">
     <stop offset="0%" stop-color="#8b5cf6" stop-opacity=".2"/>
@@ -587,12 +794,16 @@ function renderHourChart(hourly, svgId, W=640, H=70) {
   const pL=28,pR=8, bw=(W-pL-pR)/24;
   const bars=hourly.map(h=>{
     const bh=Math.max((h.orders/max*55).toFixed(0),1), x=pL+h.order_hour*bw;
-    return `<rect x="${(x+1).toFixed(0)}" y="${60-bh}" width="${Math.max(bw-2,0.5).toFixed(0)}" height="${bh}" fill="var(--blue)" rx="1.5" opacity=".72">
-      <title>${h.order_hour}:00 — ${fmt(h.orders)} orders · ${fmtK(h.gmv)}</title></rect>`;
+    return `<rect x="${(x+1).toFixed(0)}" y="${60-bh}" width="${Math.max(bw-2,0.5).toFixed(0)}" height="${bh}" fill="var(--blue)" rx="1.5" opacity=".72" data-kpi-tip="${String(h.order_hour).padStart(2,'0')}:00 • ${fmt(h.orders)} orders · ${fmtK(h.gmv)}"></rect>`;
   }).join('');
   const lbl=[0,6,12,18,23].map(h=>`<text x="${(pL+h*bw+bw/2).toFixed(0)}" y="${H-2}" text-anchor="middle" fill="var(--t3)" font-size="8">${h}:00</text>`).join('');
   svgEl.setAttribute('viewBox',`0 0 ${W} ${H}`);
   svgEl.innerHTML=bars+lbl;
+  svgEl.querySelectorAll('rect[data-kpi-tip]').forEach(node=>{
+    node.addEventListener('mouseenter', e=>showTooltip(e, `<div class="tooltip-title">${node.getAttribute('data-kpi-tip')}</div>`));
+    node.addEventListener('mousemove', positionTooltip);
+    node.addEventListener('mouseleave', hideTooltip);
+  });
 }
 
 function renderWAHourChart(hourly, svgId, W=640, H=80) {
@@ -608,12 +819,16 @@ function renderWAHourChart(hourly, svgId, W=640, H=80) {
   const pL=28,pR=8, bw=(W-pL-pR)/24;
   const bars=Object.entries(byHour).map(([hr,cnt])=>{
     const bh=Math.max((cnt/max*60).toFixed(0),1), x=pL+Number(hr)*bw;
-    return `<rect x="${(x+1).toFixed(0)}" y="${65-bh}" width="${Math.max(bw-2,0.5).toFixed(0)}" height="${bh}" fill="var(--orange)" rx="1.5" opacity=".72">
-      <title>${hr}:00 — ${fmt(cnt)} events</title></rect>`;
+    return `<rect x="${(x+1).toFixed(0)}" y="${65-bh}" width="${Math.max(bw-2,0.5).toFixed(0)}" height="${bh}" fill="var(--orange)" rx="1.5" opacity=".8" data-kpi-tip="${String(hr).padStart(2,'0')}:00 • ${fmt(cnt)} events"></rect>`;
   }).join('');
   const lbl=[0,6,12,18,23].map(h=>`<text x="${(pL+h*bw+bw/2).toFixed(0)}" y="${H-2}" text-anchor="middle" fill="var(--t3)" font-size="8">${h}:00</text>`).join('');
   svgEl.setAttribute('viewBox',`0 0 ${W} ${H}`);
   svgEl.innerHTML=bars+lbl;
+  svgEl.querySelectorAll('rect[data-kpi-tip]').forEach(node=>{
+    node.addEventListener('mouseenter', e=>showTooltip(e, `<div class="tooltip-title">${node.getAttribute('data-kpi-tip')}</div>`));
+    node.addEventListener('mousemove', positionTooltip);
+    node.addEventListener('mouseleave', hideTooltip);
+  });
 }
 
 function renderDonut(platforms, total) {
@@ -621,17 +836,22 @@ function renderDonut(platforms, total) {
   const circ=2*Math.PI*42; let off=0;
   const arcs=platforms.map((p,i)=>{
     const f=total>0?p.orders/total:0, l=f*circ;
-    const a=`<circle cx="60" cy="60" r="42" fill="none" stroke="${PCOL[p.platform]||COLORS[i]}"
-      stroke-width="20" stroke-dasharray="${l.toFixed(1)} ${circ.toFixed(1)}"
+    const col = PCOL[p.platform]||COLORS[i];
+    const a=`<circle cx="60" cy="60" r="42" fill="none" stroke="${col}"
+      stroke-width="18" stroke-dasharray="${l.toFixed(1)} ${circ.toFixed(1)}"
       stroke-dashoffset="${(-off).toFixed(1)}" transform="rotate(-90 60 60)"/>`;
     off+=l; return a;
   }).join('');
-  el('donut-svg').innerHTML=`<circle cx="60" cy="60" r="42" fill="none" stroke="var(--bg0)" stroke-width="20"/>${arcs}
-    <text x="60" y="56" text-anchor="middle" fill="var(--t1)" font-size="13" font-weight="800">${fmt(total)}</text>
-    <text x="60" y="68" text-anchor="middle" fill="var(--t3)" font-size="9">orders</text>`;
-  html('donut-leg', platforms.map((p,i)=>`
-    <div class="ditem"><div class="ddot" style="background:${PCOL[p.platform]||COLORS[i]}"></div>
-    <div><div>${PLAT[p.platform]||p.platform}</div><div class="dval">${fmt(p.orders)} · ${pct(p.orders,total)}</div></div></div>`).join(''));
+  el('donut-svg').innerHTML=`
+    <circle cx="60" cy="60" r="42" fill="none" stroke="var(--bg0)" stroke-width="18"/>
+    ${arcs}
+    <text x="60" y="56" text-anchor="middle" fill="var(--t1)" font-size="14" font-weight="800">${fmt(total)}</text>
+    <text x="60" y="70" text-anchor="middle" fill="var(--t3)" font-size="9">orders</text>`;
+  html('donut-leg', platforms.map((p,i)=>{
+    const col = PCOL[p.platform]||COLORS[i];
+    return `<div class="ditem"><div class="ddot" style="background:${col}"></div>
+    <div><div>${PLAT[p.platform]||p.platform}</div><div class="dval">${fmt(p.orders)} · ${pct(p.orders,total)}</div></div></div>`;
+  }).join(''));
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -685,7 +905,7 @@ async function loadOverview() {
     renderDonut(d.platforms, k.total_orders);
     renderHourChart(d.hourly, 'hour-svg', 640, 70);
 
-    // DoW
+    // DoW bars
     const maxDow = Math.max(...(d.dow||[]).map(x=>x.orders),1);
     const peakDow = (d.dow||[]).reduce((a,b)=>b.orders>a.orders?b:a, {order_dow:'',orders:0});
     html('dow-bars', (d.dow||[]).map((dw,i)=>`
@@ -695,19 +915,31 @@ async function loadOverview() {
           <span>${fmt(dw.orders)}</span></div></div>
         <div class="bval">${fmtK(dw.gmv)}</div></div>`).join(''));
 
-    // Delivery type
+    // Delivery type with tooltips (keep tooltips here only)
     const byPlat={};
     (d.delivery||[]).forEach(x=>{ if(!byPlat[x.platform]) byPlat[x.platform]=[]; byPlat[x.platform].push(x); });
     let dh='';
     Object.entries(byPlat).forEach(([plat,rows])=>{
       const maxC=Math.max(...rows.map(r=>r.cnt),1);
+      const totalPlat = rows.reduce((s,r) => s + r.cnt, 0);
       dh+=`<div style="font-size:10px;color:${PCOL[plat]||'#fff'};font-weight:700;margin:7px 0 4px">${PLAT[plat]||plat}</div>
-           <div class="bars" style="gap:3px">`+rows.map((r,i)=>`
-        <div class="brow"><div class="blbl w120">${r.delivery_type||'(none)'}</div>
-        <div class="btrack"><div class="bfill" style="width:${(r.cnt/maxC*100).toFixed(0)}%;background:${PCOL[plat]||COLORS[i]};cursor:pointer" onclick="showDrillOrders('Delivery Type — ${r.delivery_type||'Unknown'} (${PLAT[plat]||plat})',{delivery_type:'${(r.delivery_type||'').replace(/'/g,"\\'")}',platform:'${plat}'})">
-          <span>${fmt(r.cnt)}</span></div></div></div>`).join('')+'</div>';
+           <div class="bars" style="gap:3px">`+rows.map((r,i)=>{
+        const pctVal = ((r.cnt/totalPlat)*100).toFixed(1);
+        return `<div class="brow"><div class="blbl w120">${r.delivery_type||'(none)'}</div>
+        <div class="btrack" data-tooltip="${r.delivery_type||'Unknown'}: ${fmt(r.cnt)} orders (${pctVal}%)"><div class="bfill" style="width:${(r.cnt/maxC*100).toFixed(0)}%;background:${PCOL[plat]||COLORS[i]};cursor:pointer" onclick="showDrillOrders('Delivery Type — ${r.delivery_type||'Unknown'} (${PLAT[plat]||plat})',{delivery_type:'${(r.delivery_type||'').replace(/'/g,"\\'")}',platform:'${plat}'})">
+          <span>${fmt(r.cnt)}</span></div></div></div>`;
+      }).join('')+'</div>';
     });
     html('delivery-wrap', dh||'<div class="loading">No data</div>');
+
+    // Add hover tooltips to delivery bars only
+    document.querySelectorAll('#delivery-wrap .btrack[data-tooltip]').forEach(track => {
+      track.addEventListener('mouseenter', (e) => {
+        showTooltip(e, `<div class="tooltip-title">${track.dataset.tooltip}</div>`);
+      });
+      track.addEventListener('mousemove', positionTooltip);
+      track.addEventListener('mouseleave', hideTooltip);
+    });
 
     // Platform comparison table
     const rows=(d.platforms||[]).map(p=>`
@@ -926,19 +1158,24 @@ async function loadFunnel() {
     wk.forEach(r=>{ const k=r.event_dow||'—'; byDay[k]=(byDay[k]||0)+Number(r.total||0); });
     const wkRows = Object.entries(byDay).map(([dow,total])=>`<tr><td>${dow}</td><td class="num">${fmt(total)}</td></tr>`).join('');
     html('fn-weekly', `<table><thead><tr><th>Day</th><th>Inflow</th></tr></thead><tbody>${wkRows||'<tr><td colspan="2" class="loading">No weekly data</td></tr>'}</tbody></table>`);
+    const byDate={}; wk.forEach(r=>{ const k=normDate(r.event_date)||'—'; byDate[k]=(byDate[k]||0)+Number(r.total||0); });
+    const dRows=Object.entries(byDate).sort((a,b)=>a[0].localeCompare(b[0])).map(([dt,total])=>`<tr><td>${dt}</td><td class="num">${fmt(total)}</td></tr>`).join('');
+    html('fn-daily', `<table><thead><tr><th>Date</th><th>Inflow</th></tr></thead><tbody>${dRows||'<tr><td colspan="2" class="loading">No daily data</td></tr>'}</tbody></table>`);
 
-    const hr = d.hourly||[];
-    const byHour={}; hr.forEach(r=>{ const k=r.event_hour; byHour[k]=(byHour[k]||0)+Number(r.total||0); });
-    const hourRows=Object.entries(byHour).sort((a,b)=>a[0]-b[0]).slice(0,24);
-    const maxH=Math.max(...hourRows.map(x=>x[1]),1);
-    html('fn-hourly', hourRows.map((x,i)=>`<div class="brow"><div class="blbl w120">${String(x[0]).padStart(2,'0')}:00</div><div class="btrack"><div class="bfill ${['gr0','gr1','gr2','gr3'][i%4]}" style="width:${(x[1]/maxH*100).toFixed(0)}%"><span>${fmt(x[1])}</span></div></div></div>`).join('') || '<div class="loading">No hourly data</div>');
+    _fnHourlyRaw = d.hourly||[];
+    renderFunnelHourBars();
 
-    const topRows=(d.topShops||[]).map(r=>`<tr><td>${r.restaurant_name||r.shop_id||'—'}</td><td class="num">${fmt(r.total_events)}</td><td class="num">${fmt(r.checkout)}</td><td class="num hi">${fmt(r.orders)}</td><td class="num">${fmt(r.unique_customers)}</td></tr>`).join('');
+    const restRowsSrc = d.topShops||[];
+    const topRows=(restRowsSrc||[]).slice(0,20).map(r=>`<tr><td>${r.restaurant_name||r.shop_id||'—'}</td><td class="num">${fmt(r.total_events)}</td><td class="num">${fmt(r.checkout)}</td><td class="num hi">${fmt(r.orders)}</td><td class="num">${fmt(r.unique_customers)}</td></tr>`).join('');
     html('fn-top-shops', `<table><thead><tr><th>Restaurant</th><th>Events</th><th>Checkout</th><th>Orders</th><th>Unique</th></tr></thead><tbody>${topRows||'<tr><td colspan="5" class="loading">No store-wise data</td></tr>'}</tbody></table>`);
+    _fnRestDailyRaw = d.byRestaurantDaily || [];
+    renderRestaurantComparison('app');
 
-    const dropRows=[...(d.cartNoCheckout||[]).slice(0,5).map(r=>({...r,stage:'Cart→No Checkout'})),...(d.checkoutNoOrder||[]).slice(0,5).map(r=>({...r,stage:'Checkout→No Order'}))]
-      .map(r=>`<tr><td>${r.stage}</td><td>${r.customer_name||'—'}</td><td class="mono">${r.customer_contact||'—'}</td><td>${r.restaurant_name||'—'}</td></tr>`).join('');
-    html('fn-drop-users', `<table><thead><tr><th>Stage</th><th>Name</th><th>Contact</th><th>Restaurant</th></tr></thead><tbody>${dropRows||'<tr><td colspan="4" class="loading">No drop-off users</td></tr>'}</tbody></table>`);
+    _appDropUsers = [
+      ...(d.cartNoCheckout||[]).map(r=>({...r,stage:'Cart→No Checkout'})),
+      ...(d.checkoutNoOrder||[]).map(r=>({...r,stage:'Checkout→No Order'}))
+    ];
+    renderAppDropUsers();
   } catch(e){ console.error(e); } finally { endLoad(); }
 }
 
@@ -972,8 +1209,11 @@ async function loadFunnelWA() {
         +'</div></div></div>';
     }).join(''));
 
+    const wk = d.weeklyTrend||[];
+
     // By restaurant table
-    const rtrows=(d.byRestaurant||[]).slice(0,15).map(r=>`
+    const waRestSrc = d.byRestaurant||[];
+    const rtrows=(waRestSrc||[]).slice(0,20).map(r=>`
       <tr><td>${r.restaurant_name||r.shop_id||'—'}</td>
           <td class="num">${fmt(r.view_catalog)}</td>
           <td class="num">${fmt(r.view_cart)}</td>
@@ -983,25 +1223,23 @@ async function loadFunnelWA() {
           <td class="num">${r.cart_to_order_pct||'—'}%</td></tr>`).join('');
     html('wa-fn-rest',`<table><thead><tr><th>Restaurant</th><th>Catalog</th><th>Cart</th><th>Checkout</th><th>Orders</th><th>Unique</th><th>Cart→Ord%</th></tr></thead><tbody>${rtrows}</tbody></table>`);
 
-    // WA Hourly chart
-    renderWAHourChart(d.hourly||[], 'wa-hour-svg', 640, 85);
+    _waHourlyRaw = d.hourly||[];
+    renderWAFunnelHourBars();
 
-    // By campaign
-    const ctrows=(d.byCampaign||[]).slice(0,10).map(c=>`
-      <tr><td style="font-size:10px;color:var(--t3)">${c.campaign_name||'—'}</td>
-          <td class="num">${fmt(c.total_events)}</td>
-          <td class="num">${fmt(c.unique_customers)}</td>
-          <td class="num hi">${fmt(c.orders)}</td></tr>`).join('');
-    html('wa-fn-camp',`<table><thead><tr><th>Campaign</th><th>Events</th><th>Unique</th><th>Orders</th></tr></thead><tbody>${ctrows||'<tr><td colspan="4" class="loading">No campaign data</td></tr>'}</tbody></table>`);
-
-    const wk=d.weeklyTrend||[];
     const byDay={}; wk.forEach(r=>{ const k=r.event_dow||'—'; byDay[k]=(byDay[k]||0)+Number(r.total||0); });
     const wkRows=Object.entries(byDay).map(([dow,total])=>`<tr><td>${dow}</td><td class="num">${fmt(total)}</td></tr>`).join('');
     html('wa-weekly', `<table><thead><tr><th>Day</th><th>Inflow</th></tr></thead><tbody>${wkRows||'<tr><td colspan="2" class="loading">No weekly data</td></tr>'}</tbody></table>`);
+    const byDate={}; wk.forEach(r=>{ const k=normDate(r.event_date)||'—'; byDate[k]=(byDate[k]||0)+Number(r.total||0); });
+    const dRows=Object.entries(byDate).sort((a,b)=>a[0].localeCompare(b[0])).map(([dt,total])=>`<tr><td>${dt}</td><td class="num">${fmt(total)}</td></tr>`).join('');
+    html('wa-daily', `<table><thead><tr><th>Date</th><th>Inflow</th></tr></thead><tbody>${dRows||'<tr><td colspan="2" class="loading">No daily data</td></tr>'}</tbody></table>`);
+    _waRestDailyRaw = d.byRestaurantDaily || [];
+    renderRestaurantComparison('wa');
 
-    const dropRows=[...(d.cartNoCheckout||[]).slice(0,6).map(r=>({...r,stage:'Cart→No Checkout'})),...(d.checkoutNoOrder||[]).slice(0,6).map(r=>({...r,stage:'Checkout→No Order'}))]
-      .map(r=>`<tr><td>${r.stage}</td><td>${r.customer_name||'—'}</td><td class="mono">${r.customer_contact||'—'}</td><td>${r.restaurant_name||'—'}</td></tr>`).join('');
-    html('wa-drop-users', `<table><thead><tr><th>Stage</th><th>Name</th><th>Contact</th><th>Restaurant</th></tr></thead><tbody>${dropRows||'<tr><td colspan="4" class="loading">No drop-off users</td></tr>'}</tbody></table>`);
+    _waDropUsers = [
+      ...(d.cartNoCheckout||[]).map(r=>({...r,stage:'Cart→No Checkout'})),
+      ...(d.checkoutNoOrder||[]).map(r=>({...r,stage:'Checkout→No Order'}))
+    ];
+    renderWADropUsers();
   } catch(e){ console.error(e); } finally { endLoad(); }
 }
 
@@ -1226,6 +1464,17 @@ function toggleCollapse(cardId) {
     card.classList.add('open');
     body.style.display = 'block';
   }
+}
+
+// Toggle section visibility (for Daily Inflow, Smart Comparison, etc.)
+function toggleSection(wrapId) {
+  const wrap = el(wrapId);
+  if (!wrap) return;
+  const iconId = wrapId.replace('-wrap', '-icon');
+  const icon = el(iconId);
+  const isHidden = wrap.style.display === 'none' || !wrap.style.display;
+  wrap.style.display = isHidden ? 'block' : 'none';
+  if (icon) icon.textContent = isHidden ? '▲' : '▼';
 }
 
 // Quick filter buttons

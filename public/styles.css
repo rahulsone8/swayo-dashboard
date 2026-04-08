@@ -1,5 +1,7 @@
 /* ─── RESET & BASE ───────────────────────────────────────────── */
 *{box-sizing:border-box;margin:0;padding:0}
+
+/* ─── DARK THEME (default) ───────────────────────────────────── */
 :root{
   --bg0:#0c0f1a;--bg1:#111827;--bg2:#1a2235;--bg3:#1e293b;
   --bdr:#1e2d47;--bdr2:#253350;
@@ -8,7 +10,36 @@
   --red:#ef4444;--purple:#8b5cf6;--teal:#06b6d4;--pink:#ec4899;
   --blue-d:#1d4ed8;--green-d:#059669;
   --glow-b:rgba(59,130,246,.15);--glow-g:rgba(16,185,129,.15);
+  --nav-bg:rgba(10,13,24,.95);
+  --modal-bg:rgba(0,0,0,.7);
 }
+
+/* ─── LIGHT THEME ────────────────────────────────────────────── */
+[data-theme="light"]{
+  --bg0:#f1f5f9;--bg1:#ffffff;--bg2:#ffffff;--bg3:#f8fafc;
+  --bdr:#e2e8f0;--bdr2:#cbd5e1;
+  --t1:#0f172a;--t2:#334155;--t3:#64748b;
+  --blue:#2563eb;--green:#059669;--orange:#d97706;
+  --red:#dc2626;--purple:#7c3aed;--teal:#0891b2;--pink:#db2777;
+  --blue-d:#1d4ed8;--green-d:#047857;
+  --glow-b:rgba(37,99,235,.12);--glow-g:rgba(5,150,105,.12);
+  --nav-bg:rgba(255,255,255,.98);
+  --modal-bg:rgba(15,23,42,.5);
+}
+[data-theme="light"] .brand{color:#0f172a}
+[data-theme="light"] .nav{box-shadow:0 1px 3px rgba(0,0,0,.08);border-bottom-color:#e2e8f0}
+[data-theme="light"] .card{box-shadow:0 1px 3px rgba(0,0,0,.06)}
+[data-theme="light"] .card:hover{box-shadow:0 4px 12px rgba(0,0,0,.08)}
+[data-theme="light"] .kpi{box-shadow:0 1px 3px rgba(0,0,0,.06)}
+[data-theme="light"] .kpi:hover{box-shadow:0 4px 12px rgba(0,0,0,.1)}
+[data-theme="light"] .fbar{background:rgba(255,255,255,.98);border-bottom-color:#e2e8f0}
+[data-theme="light"] .tab:hover{background:rgba(37,99,235,.06)}
+[data-theme="light"] .tab.active{background:rgba(37,99,235,.1)}
+[data-theme="light"] .fbtn{box-shadow:0 1px 3px rgba(37,99,235,.2)}
+[data-theme="light"] .ms-panel{box-shadow:0 4px 20px rgba(0,0,0,.12)}
+[data-theme="light"] table th{background:#f8fafc}
+[data-theme="light"] tr:hover td{background:rgba(37,99,235,.04)}
+[data-theme="light"] .theme-toggle{background:#f1f5f9}
 body{background:var(--bg0);font-family:'Segoe UI',system-ui,sans-serif;color:var(--t1);min-height:100vh;overflow-x:hidden}
 a{text-decoration:none;color:inherit}
 button{font-family:inherit}
@@ -20,7 +51,7 @@ button{font-family:inherit}
 
 /* ─── NAV ────────────────────────────────────────────────────── */
 .nav{
-  background:rgba(10,13,24,.95);
+  background:var(--nav-bg);
   backdrop-filter:blur(12px);
   border-bottom:1px solid var(--bdr);
   display:flex;align-items:center;
@@ -28,6 +59,19 @@ button{font-family:inherit}
   position:sticky;top:0;z-index:300;
   gap:0;overflow-x:auto;flex-wrap:nowrap;
 }
+
+/* ─── THEME TOGGLE ───────────────────────────────────────────── */
+.theme-toggle{
+  display:flex;align-items:center;gap:6px;
+  margin-left:12px;padding:4px 10px;
+  background:var(--bg2);border:1px solid var(--bdr2);
+  border-radius:20px;cursor:pointer;transition:all .2s;
+  flex-shrink:0;
+}
+.theme-toggle:hover{border-color:var(--blue)}
+.theme-toggle-icon{font-size:14px;transition:transform .3s}
+.theme-toggle:hover .theme-toggle-icon{transform:rotate(20deg)}
+.theme-toggle-label{font-size:10px;color:var(--t2);text-transform:uppercase;letter-spacing:.5px}
 .nav::-webkit-scrollbar{height:2px}
 .brand{
   font-size:16px;font-weight:800;color:#fff;
@@ -90,6 +134,13 @@ button{font-family:inherit}
 .fbtn:hover{background:var(--blue-d)}
 .fbtn.sec{background:var(--bg2);color:var(--t2);border:1px solid var(--bdr2)}
 .fbtn.sec:hover{border-color:var(--blue);color:var(--blue)}
+.drop-chip-row{display:flex;gap:6px;flex-wrap:wrap}
+.drop-chip{
+  background:var(--bg2);border:1px solid var(--bdr2);color:var(--t2);
+  padding:4px 8px;border-radius:16px;font-size:10px;cursor:pointer;font-weight:600;
+}
+.drop-chip:hover{border-color:var(--blue);color:var(--blue)}
+.drop-chip.active{background:rgba(59,130,246,.12);border-color:var(--blue);color:var(--blue)}
 /* ─── CUSTOM MULTI-SELECT DROPDOWN ─────────────────────────────── */
 .ms-wrap{position:relative;display:inline-block}
 .ms-btn{
@@ -323,15 +374,37 @@ button{font-family:inherit}
   color:var(--t2);padding:2px 8px;border-radius:20px;font-weight:600;
 }
 
+/* ─── TOOLTIPS ───────────────────────────────────────────────── */
+.tooltip{
+  position:fixed;z-index:9999;
+  background:var(--bg2);border:1px solid var(--bdr2);
+  border-radius:8px;padding:10px 14px;
+  box-shadow:0 8px 32px rgba(0,0,0,.3);
+  font-size:11px;color:var(--t1);
+  pointer-events:none;opacity:0;
+  transform:translateY(8px);
+  transition:opacity .15s,transform .15s;
+  max-width:260px;
+}
+.tooltip.visible{opacity:1;transform:translateY(0)}
+.tooltip-title{font-weight:700;font-size:12px;margin-bottom:6px;color:var(--t1)}
+.tooltip-title.sm{font-size:10px;font-weight:600;margin-bottom:2px}
+.tooltip-row{display:flex;justify-content:space-between;gap:16px;padding:3px 0}
+.tooltip-row .label{color:var(--t3)}
+.tooltip-row .value{font-weight:600;color:var(--t1)}
+
+/* ─── SVG CHART INTERACTIVITY ────────────────────────────────── */
+svg rect[onclick]:hover{filter:brightness(1.15);cursor:pointer}
+
 /* ─── BARS ───────────────────────────────────────────────────── */
-.bars{display:flex;flex-direction:column;gap:5px}
-.brow{display:flex;align-items:center;gap:8px}
-.blbl{font-size:11px;color:var(--t2);width:160px;text-align:right;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bars{display:flex;flex-direction:column;gap:6px}
+.brow{display:flex;align-items:center;gap:10px}
+.blbl{font-size:11px;color:var(--t2);width:160px;text-align:right;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
 .blbl.w120{width:120px}.blbl.w200{width:200px}
-.btrack{flex:1;background:var(--bg0);border-radius:3px;height:18px;overflow:hidden}
-.bfill{height:100%;border-radius:3px;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;transition:width .5s ease}
-.bfill span{font-size:10px;font-weight:700;color:rgba(255,255,255,.85);white-space:nowrap}
-.bval{font-size:10px;color:var(--t3);margin-left:5px;white-space:nowrap;flex-shrink:0}
+.btrack{flex:1;background:var(--bg0);border-radius:4px;height:20px;overflow:hidden}
+.bfill{height:100%;border-radius:4px;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;transition:width .3s ease}
+.bfill span{font-size:10px;font-weight:700;color:#fff;white-space:nowrap}
+.bval{font-size:11px;color:var(--t2);margin-left:6px;white-space:nowrap;flex-shrink:0;font-weight:600}
 
 /* gradient presets */
 .gr0{background:linear-gradient(90deg,#3b82f6,#60a5fa)}
@@ -339,7 +412,7 @@ button{font-family:inherit}
 .gr2{background:linear-gradient(90deg,#8b5cf6,#a78bfa)}
 .gr3{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
 .gr4{background:linear-gradient(90deg,#ef4444,#f87171)}
-.gr5{background:linear-gradient(90deg,#06b6d4,#38bdf8)}
+.gr5{background:linear-gradient(90deg,#06b6d4,#22d3ee)}
 .gr6{background:linear-gradient(90deg,#ec4899,#f472b6)}
 
 /* ─── TABLE ──────────────────────────────────────────────────── */

@@ -40,6 +40,10 @@
   <div class="tab" data-page="coupons-tab">🎟 Coupons</div>
   <a href="/export.html" target="_blank" style="padding:0 13px;height:54px;display:flex;align-items:center;font-size:11px;color:var(--green);white-space:nowrap;gap:4px;border-bottom:2px solid rgba(16,185,129,.4);font-weight:700;flex-shrink:0">⬇ Export</a>
   <div class="nav-r">
+    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">
+      <span class="theme-toggle-icon" id="theme-icon">🌙</span>
+      <span class="theme-toggle-label" id="theme-label">Dark</span>
+    </button>
     <div class="db-dot" id="db-dot"></div>
     <span style="font-size:10px;color:var(--t3)" id="db-lbl">—</span>
     <span style="font-size:10px;color:var(--t3);margin-left:4px" id="last-ref"></span>
@@ -312,6 +316,8 @@
     <div class="card c2">
       <div class="card-title">📅 Weekly Inflow Trend</div>
       <div class="tbl-wrap" id="fn-weekly"></div>
+      <div class="sec-h collapsible" style="margin-top:10px" onclick="toggleSection('fn-daily-wrap')">Daily Inflow <span id="fn-daily-icon">▼</span></div>
+      <div id="fn-daily-wrap" class="collapsible-content" style="display:none"><div class="tbl-wrap" id="fn-daily"></div></div>
     </div>
     <div class="card c1">
       <div class="card-title">⏰ Most Active Hours</div>
@@ -322,9 +328,19 @@
     <div class="card c2">
       <div class="card-title">🏪 Top 10 Restaurants by Funnel Activity</div>
       <div class="tbl-wrap" id="fn-top-shops"></div>
+      <div class="sec-h collapsible" style="margin-top:10px" onclick="toggleSection('fn-compare-wrap')">Smart Comparison (Week-over-Week) <span id="fn-compare-icon">▼</span></div>
+      <div id="fn-compare-wrap" class="collapsible-content" style="display:none"><div class="tbl-wrap" id="fn-rest-compare"></div></div>
     </div>
     <div class="card c1">
       <div class="card-title">🚨 Drop-off Users (Actionable)</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+        <div id="fn-drop-stage-chips" class="drop-chip-row">
+          <button class="drop-chip active" onclick="setDropStage('app','all')">All</button>
+          <button class="drop-chip" onclick="setDropStage('app','cart')">Cart→No Checkout</button>
+          <button class="drop-chip" onclick="setDropStage('app','checkout')">Checkout→No Order</button>
+        </div>
+        <button class="fbtn sec" onclick="exportDropUsers('app')">⬇ CSV</button>
+      </div>
       <div class="tbl-wrap" id="fn-drop-users"></div>
     </div>
   </div>
@@ -343,25 +359,33 @@
     <div class="card c1">
       <div class="card-title">🏪 By Restaurant</div>
       <div class="tbl-wrap" id="wa-fn-rest"></div>
+      <div class="sec-h collapsible" style="margin-top:10px" onclick="toggleSection('wa-compare-wrap')">Smart Comparison (Week-over-Week) <span id="wa-compare-icon">▼</span></div>
+      <div id="wa-compare-wrap" class="collapsible-content" style="display:none"><div class="tbl-wrap" id="wa-rest-compare"></div></div>
     </div>
   </div>
   <div class="row">
-    <div class="card c2 clickable" onclick="openModal('wa-hourly','WA Funnel — Hourly Pattern')">
-      <div class="card-title">⏰ WA Activity by Hour <span class="expand-hint">🔍</span></div>
-      <svg id="wa-hour-svg" width="100%" height="90" viewBox="0 0 640 90"></svg>
-    </div>
-    <div class="card c1">
-      <div class="card-title">📣 By Campaign</div>
-      <div class="tbl-wrap" id="wa-fn-camp"></div>
+    <div class="card c3">
+      <div class="card-title">⏰ WA Activity by Hour</div>
+      <div class="bars" id="wa-fn-hourly"></div>
     </div>
   </div>
   <div class="row">
     <div class="card c2">
       <div class="card-title">📅 Weekly Inflow Trend</div>
       <div class="tbl-wrap" id="wa-weekly"></div>
+      <div class="sec-h collapsible" style="margin-top:10px" onclick="toggleSection('wa-daily-wrap')">Daily Inflow <span id="wa-daily-icon">▼</span></div>
+      <div id="wa-daily-wrap" class="collapsible-content" style="display:none"><div class="tbl-wrap" id="wa-daily"></div></div>
     </div>
     <div class="card c1">
       <div class="card-title">🚨 Drop-off Users (WA)</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+        <div id="wa-drop-stage-chips" class="drop-chip-row">
+          <button class="drop-chip active" onclick="setDropStage('wa','all')">All</button>
+          <button class="drop-chip" onclick="setDropStage('wa','cart')">Cart→No Checkout</button>
+          <button class="drop-chip" onclick="setDropStage('wa','checkout')">Checkout→No Order</button>
+        </div>
+        <button class="fbtn sec" onclick="exportDropUsers('wa')">⬇ CSV</button>
+      </div>
       <div class="tbl-wrap" id="wa-drop-users"></div>
     </div>
   </div>

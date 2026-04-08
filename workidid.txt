@@ -1,0 +1,32 @@
+Session Summary — Swayo Dashboard Improvements - 8th morning
+1️⃣ Security Fix
+Removed hardcoded DB credentials from server.js
+Now requires env vars (DB_HOST, DB_USER, etc.)
+2️⃣ Dark/Light Mode Toggle
+Added theme toggle button in nav
+CSS variables for light theme
+localStorage persistence + system preference detection
+3️⃣ Chart Improvements (Overview Page)
+Removed neon colors → restored original colors
+Fixed double tooltip issue (native + custom)
+Removed glow effects
+Fixed chart label clipping at top
+4️⃣ Tooltip System
+Built global custom tooltip (showTooltip, hideTooltip, positionTooltip)
+Tooltips now follow cursor properly across modals
+Added tooltips to daily bars (date-only, no time)
+5️⃣ App Funnel Page
+Removed 📣 By Campaign section from WA Funnel
+Fixed ⏰ WA Activity by Hour (was showing only 00:00)
+Added Smart Comparison table (restaurant day-over-day % change)
+Added Daily Inflow table under Weekly
+Added stage filter chips for drop-off users
+Added CSV download for drop-off users
+Removed hour/date/month filters (simplified UI)
+6️⃣ WA Funnel Page
+Same improvements as App Funnel
+Fixed hourly data aggregation
+Added Smart Comparison + Daily tables
+7️⃣ Backend (server.js)
+Added byRestaurantDaily endpoint data for comparison
+Added byRestaurantMonthly endpoint data (later removed from UI)

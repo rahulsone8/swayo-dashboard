@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>Pipeline DB — Schema Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#0a0c10;
+  --paper:#f5f3ee;
+  --card:#fffdf8;
+  --stroke:#d4cfc4;
+  --stroke2:#b8b0a2;
+  --dim-h:#1a472a;    --dim-b:#d4edda;    --dim-dot:#2e7d46;
+  --fact-h:#1a2e47;   --fact-b:#d0e3f5;   --fact-dot:#2563a8;
+  --event-h:#3b1a47;  --event-b:#ead5f5;  --event-dot:#7c3aac;
+  --camp-h:#47311a;   --camp-b:#f5e4d0;   --camp-dot:#b5561c;
+  --agg-h:#47331a;    --agg-b:#fdf0d0;    --agg-dot:#c47d0e;
+  --pk:#c0392b;       --fk:#1a5276;
+  --join:#8a7968;
+  --glow-dim:rgba(46,125,70,.12);
+  --glow-fact:rgba(37,99,168,.12);
+}
+html{background:var(--paper);font-family:'Syne',sans-serif;color:var(--ink);min-height:100vh}
+body{padding:0}
+
+/* ── HERO HEADER ── */
+.hero{
+  background:var(--ink);
+  padding:32px 48px 28px;
+  display:flex;align-items:flex-end;justify-content:space-between;
+  border-bottom:3px solid #2a2f38;
+}
+.hero-title{font-size:32px;font-weight:800;color:#f5f3ee;letter-spacing:-1px;line-height:1}
+.hero-title span{color:#4ade80}
+.hero-sub{font-family:'JetBrains Mono',monospace;font-size:11px;color:#6b7280;margin-top:6px;letter-spacing:.5px}
+.hero-stats{display:flex;gap:24px}
+.stat{text-align:right}
+.stat-n{font-size:28px;font-weight:800;color:#4ade80;line-height:1}
+.stat-l{font-size:10px;font-family:'JetBrains Mono',monospace;color:#6b7280;letter-spacing:.5px;text-transform:uppercase}
+
+/* ── LEGEND ── */
+.legend{
+  background:var(--card);
+  border-bottom:1px solid var(--stroke);
+  padding:12px 48px;
+  display:flex;gap:28px;align-items:center;flex-wrap:wrap;
+}
+.leg-item{display:flex;align-items:center;gap:7px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#555;letter-spacing:.3px}
+.leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.leg-sep{width:1px;height:16px;background:var(--stroke);margin:0 4px}
+.pk-badge{background:#fdecea;color:var(--pk);border:1px solid #f5c6c0;font-family:'JetBrains Mono',monospace;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700}
+.fk-badge{background:#e8f0fb;color:var(--fk);border:1px solid #b8d0f0;font-family:'JetBrains Mono',monospace;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700}
+
+/* ── MAIN DIAGRAM CANVAS ── */
+.canvas-wrap{position:relative;overflow:auto;padding:48px;background:var(--paper)}
+.canvas{position:relative;width:1600px;min-height:1100px}
+
+/* ── SVG JOIN LINES ── */
+.join-svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.join-line{stroke:var(--join);stroke-width:1.5;fill:none;stroke-dasharray:none;opacity:.55}
+.join-line.strong{stroke:#2563a8;stroke-width:2;opacity:.7}
+.join-line.dim{stroke:var(--dim-dot);stroke-width:2;opacity:.6}
+.join-dot{fill:var(--join)}
+
+/* ── TABLE CARD ── */
+.tcard{
+  position:absolute;
+  background:var(--card);
+  border:1.5px solid var(--stroke);
+  border-radius:10px;
+  box-shadow:0 2px 8px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.05);
+  min-width:220px;
+  transition:box-shadow .2s,transform .2s;
+  cursor:default;
+  z-index:2;
+  touch-action:none;
+}
+.tcard:hover{
+  box-shadow:0 8px 28px rgba(0,0,0,.13),0 2px 6px rgba(0,0,0,.08);
+  transform:translateY(-2px);
+  z-index:10;
+}
+.tcard.dragging{
+  z-index:50;
+  box-shadow:0 14px 36px rgba(0,0,0,.18),0 2px 8px rgba(0,0,0,.12);
+}
+
+/* ── TABLE HEADER ── */
+.thead{
+  border-radius:8px 8px 0 0;
+  padding:9px 13px 8px;
+  display:flex;align-items:center;gap:8px;
+  cursor:grab;
+  user-select:none;
+}
+.thead:active{cursor:grabbing}
+.thead-icon{width:8px;height:8px;border-radius:50%}
+.thead-name{font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;letter-spacing:.3px;line-height:1}
+.thead-type{font-size:9px;font-family:'JetBrains Mono',monospace;opacity:.7;margin-top:2px;display:block;letter-spacing:.5px;text-transform:uppercase}
+
+.tcard.dim  .thead{background:var(--dim-b);color:var(--dim-h)}
+.tcard.fact .thead{background:var(--fact-b);color:var(--fact-h)}
+.tcard.event .thead{background:var(--event-b);color:var(--event-h)}
+.tcard.camp .thead{background:var(--camp-b);color:var(--camp-h)}
+.tcard.agg  .thead{background:var(--agg-b);color:var(--agg-h)}
+
+.tcard.dim  .thead-icon{background:var(--dim-dot)}
+.tcard.fact .thead-icon{background:var(--fact-dot)}
+.tcard.event .thead-icon{background:var(--event-dot)}
+.tcard.camp .thead-icon{background:var(--camp-dot)}
+.tcard.agg  .thead-icon{background:var(--agg-dot)}
+
+/* ── COLUMN ROWS ── */
+.tcols{padding:6px 0 4px}
+.tcol{
+  display:flex;align-items:baseline;gap:6px;
+  padding:3px 13px;
+  font-family:'JetBrains Mono',monospace;font-size:10px;
+  border-bottom:1px solid transparent;
+  transition:background .12s;
+  line-height:1.35;
+}
+.tcol:last-child{border-bottom:none}
+.tcol:hover{background:#f0ede6}
+.tcol.is-pk{background:#fff8f7}
+.tcol.is-fk{background:#f5f8ff}
+.tcol.is-pk:hover{background:#fdecea}
+.tcol.is-fk:hover{background:#e8f0fb}
+.col-key{flex-shrink:0;width:28px}
+.col-name{flex:1;color:#1a1a2e;font-weight:500;font-size:10.5px}
+.col-type{color:#888;font-size:9.5px;white-space:nowrap}
+.col-note{color:#aaa;font-size:9px;font-style:italic;white-space:nowrap;margin-left:2px}
+
+/* ── SECTION LABELS (floating) ── */
+.section-label{
+  position:absolute;
+  font-family:'JetBrains Mono',monospace;
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:1.5px;
+  text-transform:uppercase;
+  opacity:.35;
+  pointer-events:none;
+  z-index:1;
+}
+
+/* ── TOOLTIP ── */
+.tip{
+  position:fixed;background:var(--ink);color:#f5f3ee;
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  padding:8px 12px;border-radius:6px;pointer-events:none;
+  z-index:999;display:none;max-width:280px;line-height:1.5;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);
+}
+
+/* ── CONTROLS ── */
+.controls{
+  position:fixed;bottom:24px;right:24px;
+  display:flex;flex-direction:column;gap:8px;z-index:100;
+}
+.ctrl-btn{
+  width:38px;height:38px;border-radius:8px;
+  background:var(--ink);color:#f5f3ee;
+  border:none;cursor:pointer;font-size:16px;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 3px 10px rgba(0,0,0,.25);transition:background .15s;
+}
+.ctrl-btn:hover{background:#1e293b}
+
+/* ── JOIN LABEL CHIPS ── */
+.join-chip{
+  position:absolute;
+  font-family:'JetBrains Mono',monospace;
+  font-size:8.5px;
+  background:var(--paper);
+  border:1px solid var(--stroke2);
+  color:var(--join);
+  padding:1px 5px;
+  border-radius:4px;
+  pointer-events:none;
+  white-space:nowrap;
+  z-index:5;
+  letter-spacing:.3px;
+}
+</style>
+</head>
+<body>
+
+<!-- ── HERO ─────────────────────────────────────────────────── -->
+<div class="hero">
+  <div>
+    <div class="hero-title">Pipeline <span>Database</span> Schema</div>
+  <div class="hero-sub">Designed by ~ Rahul ·To understand the structure · funnel_pipeline DB</div>
+  </div>
+  <div class="hero-stats">
+    <div class="stat"><div class="stat-n">13</div><div class="stat-l">Tables</div></div>
+    <div class="stat"><div class="stat-n">12</div><div class="stat-l">Relationships</div></div>
+    <div class="stat"><div class="stat-n">121</div><div class="stat-l">Columns</div></div>
+  </div>
+</div>
+
+<!-- ── LEGEND ─────────────────────────────────────────────── -->
+<div class="legend">
+  <div class="leg-item"><div class="leg-dot" style="background:var(--dim-dot)"></div>DIMENSION</div>
+  <div class="leg-item"><div class="leg-dot" style="background:var(--fact-dot)"></div>FACT (Core)</div>
+  <div class="leg-item"><div class="leg-dot" style="background:var(--event-dot)"></div>FACT (Event / Funnel)</div>
+  <div class="leg-item"><div class="leg-dot" style="background:var(--camp-dot)"></div>FACT (Campaign)</div>
+  <div class="leg-item"><div class="leg-dot" style="background:var(--agg-dot)"></div>AGGREGATE</div>
+  <div class="leg-sep"></div>
+  <div class="leg-item"><span class="pk-badge">PK</span> Primary Key</div>
+  <div class="leg-item"><span class="fk-badge">FK</span> Foreign Key (JOIN)</div>
+  <div class="leg-sep"></div>
+  <div class="leg-item" style="color:#888;font-family:'JetBrains Mono',monospace;font-size:10px">I know it's complex</div>
+</div>
+
+<!-- ── CANVAS ─────────────────────────────────────────────── -->
+<div class="canvas-wrap" id="canvas-wrap">
+<div class="canvas" id="canvas">
+
+  <!-- Section labels -->
+  <div class="section-label" style="left:28px;top:18px;color:var(--dim-dot)">DIMENSIONS</div>
+  <div class="section-label" style="left:490px;top:18px;color:var(--fact-dot)">CORE FACTS</div>
+  <div class="section-label" style="left:1010px;top:18px;color:var(--event-dot)">EVENT FACTS</div>
+  <div class="section-label" style="left:28px;top:530px;color:var(--agg-dot)">AGGREGATIONS</div>
+
+  <!-- SVG join lines drawn by JS -->
+  <svg class="join-svg" id="join-svg"></svg>
+
+  <!-- ════════ DIMENSIONS ════════ -->
+
+  <!-- dim_restaurants -->
+  <div class="tcard dim" id="dim_restaurants" style="left:30px;top:48px">
+    <div class="thead">
+      <div class="thead-icon"></div>
+      <div><div class="thead-name">dim_restaurants</div><span class="thead-type">Dimension</span></div>
+    </div>
+    <div class="tcols">
+      <div class="tcol is-pk" data-tip="PRIMARY KEY — all other tables join here via shop_id">
+        <span class="col-key"><span class="pk-badge">PK</span></span>
+        <span class="col-name">shop_id</span>
+        <span class="col-type">VARCHAR</span>
+      </div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">restaurant_name</span><span class="col-type">VARCHAR</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">seller_name</span><span class="col-type">VARCHAR</span><span class="col-note">alias</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">city</span><span class="col-type">VARCHAR</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">seller_pincode</span><span class="col-type">DECIMAL</span></div>
+    </div>
+  </div>
+
+  <!-- dim_customers -->
+  <div class="tcard dim" id="dim_customers" style="left:30px;top:258px">
+    <div class="thead">
+      <div class="thead-icon"></div>
+      <div><div class="thead-name">dim_customers</div><span class="thead-type">Dimension</span></div>
+    </div>
+    <div class="tcols">
+      <div class="tcol is-pk" data-tip="PRIMARY KEY — 10-digit cleaned mobile number. All order + funnel tables join here.">
+        <span class="col-key"><span class="pk-badge">PK</span></span>
+        <span class="col-name">customer_contact</span>
+        <span class="col-type">VARCHAR(10)</span>
+      </div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">customer_name</span><span class="col-type">VARCHAR</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">platform</span><span class="col-type">VARCHAR</span></div>
+    </div>
+  </div>
+
+  <!-- ════════ FACT (CENTRAL) ════════ -->
+
+  <!-- fact_orders — STAR CENTER -->
+  <div class="tcard fact" id="fact_orders" style="left:310px;top:48px">
+    <div class="thead">
+      <div class="thead-icon"></div>
+      <div><div class="thead-name">fact_orders ★</div><span class="thead-type">Central Fact Table</span></div>
+    </div>
+    <div class="tcols">
+      <div class="tcol is-pk" data-tip="PRIMARY KEY — unique order identifier. Format: GFFW / SWWA / SWYO prefix.">
+        <span class="col-key"><span class="pk-badge">PK</span></span>
+        <span class="col-name">order_id</span><span class="col-type">VARCHAR</span>
+      </div>
+      <div class="tcol is-fk" data-tip="FOREIGN KEY → dim_restaurants.shop_id — joins to get restaurant_name, city, pincode">
+        <span class="col-key"><span class="fk-badge">FK</span></span>
+        <span class="col-name">shop_id</span><span class="col-type">VARCHAR</span>
+      </div>
+      <div class="tcol is-fk" data-tip="FOREIGN KEY → dim_customers.customer_contact — joins to get customer_name, segment">
+        <span class="col-key"><span class="fk-badge">FK</span></span>
+        <span class="col-name">customer_contact</span><span class="col-type">VARCHAR(10)</span>
+      </div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">platform</span><span class="col-type">VARCHAR</span><span class="col-note">gf_whatsapp | swayo_app | swayo_whatsapp</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">restaurant_name</span><span class="col-type">VARCHAR</span><span class="col-note">denorm</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">order_status</span><span class="col-type">VARCHAR</span><span class="col-note">Completed|Cancelled|In-Progress</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">order_value</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">net_revenue</span><span class="col-type">DECIMAL</span><span class="col-note">= value − discount</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">discount</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">has_coupon</span><span class="col-type">INT(0/1)</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">coupon_value</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">is_cancelled</span><span class="col-type">INT(0/1)</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">delivery_type</span><span class="col-type">VARCHAR</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">delivery_distance</span><span class="col-type">FLOAT</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">packing_charge</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">delivery_charge</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">convenience_charge</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">menu_discount</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">cart_discount</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">tax</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">order_date</span><span class="col-type">DATE</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">order_year / month / week</span><span class="col-type">INT</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">order_hour / order_dow</span><span class="col-type">INT / VARCHAR</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">order_month_name</span><span class="col-type">VARCHAR</span></div>
+    </div>
+  </div>
+
+  <!-- fact_order_items -->
+  <div class="tcard fact" id="fact_order_items" style="left:310px;top:680px">
+    <div class="thead">
+      <div class="thead-icon"></div>
+      <div><div class="thead-name">fact_order_items</div><span class="thead-type">Fact — Items</span></div>
+    </div>
+    <div class="tcols">
+      <div class="tcol is-fk" data-tip="FOREIGN KEY → fact_orders.order_id — many items per order (one-to-many)">
+        <span class="col-key"><span class="fk-badge">FK</span></span>
+        <span class="col-name">order_id</span><span class="col-type">VARCHAR</span>
+      </div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">product_name</span><span class="col-type">VARCHAR</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">platform</span><span class="col-type">VARCHAR</span></div>
+    </div>
+  </div>
+
+  <!-- fact_order_geo -->
+  <div class="tcard fact" id="fact_order_geo" style="left:310px;top:810px">
+    <div class="thead">
+      <div class="thead-icon"></div>
+      <div><div class="thead-name">fact_order_geo</div><span class="thead-type">Fact — Geo / Location</span></div>
+    </div>
+    <div class="tcols">
+      <div class="tcol is-fk" data-tip="FOREIGN KEY → fact_orders.order_id — one geo row per order">
+        <span class="col-key"><span class="fk-badge">FK</span></span>
+        <span class="col-name">order_id</span><span class="col-type">VARCHAR</span>
+      </div>
+      <div class="tcol is-fk" data-tip="FOREIGN KEY → dim_customers.customer_contact — soft join for customer pincode analysis">
+        <span class="col-key"><span class="fk-badge">FK</span></span>
+        <span class="col-name">customer_contact</span><span class="col-type">VARCHAR(10)</span>
+      </div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">platform</span><span class="col-type">VARCHAR</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">restaurant_name</span><span class="col-type">VARCHAR</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">restaurant_pincode</span><span class="col-type">VARCHAR(6)</span><span class="col-note">Seller_Pincode</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">customer_pincode</span><span class="col-type">VARCHAR(6)</span><span class="col-note">regex from address</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">delivery_address</span><span class="col-type">TEXT</span><span class="col-note">full address string</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">delivery_distance</span><span class="col-type">FLOAT</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">order_date</span><span class="col-type">DATE</span></div>
+    </div>
+  </div>
+
+  <!-- ════════ FACT (EVENT) ════════ -->
+
+  <!-- fact_funnel -->
+  <div class="tcard event" id="fact_funnel" style="left:1000px;top:48px">
+    <div class="thead">
+      <div class="thead-icon"></div>
+      <div><div class="thead-name">fact_funnel</div><span class="thead-type">Fact — Swayo App Funnel</span></div>
+    </div>
+    <div class="tcols">
+      <div class="tcol is-pk" data-tip="Incremental row ID — checkpoint saved in funnel_last_run.txt">
+        <span class="col-key"><span class="pk-badge">PK</span></span>
+        <span class="col-name">row_id</span><span class="col-type">INT</span>
+      </div>
+      <div class="tcol is-fk" data-tip="FOREIGN KEY → dim_restaurants.shop_id — PDP events carry shop_id, PLP events have NULL (by design)">
+        <span class="col-key"><span class="fk-badge">FK</span></span>
+        <span class="col-name">shop_id</span><span class="col-type">VARCHAR</span><span class="col-note">NULL for PLP</span>
+      </div>
+      <div class="tcol is-fk" data-tip="SOFT FK → dim_customers — NULL for PDP (anonymous browse), filled for PLP/CART/CHECKOUT/ORDER">
+        <span class="col-key"><span class="fk-badge">FK</span></span>
+        <span class="col-name">customer_contact</span><span class="col-type">VARCHAR(10)</span><span class="col-note">NULL for PDP</span>
+      </div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">action</span><span class="col-type">VARCHAR</span><span class="col-note">PDP|PLP|VIEW_CART|CHECKOUT|ORDER</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">action_order</span><span class="col-type">INT</span><span class="col-note">1–5 for sort</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">timestamp</span><span class="col-type">DATETIME</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">event_date</span><span class="col-type">DATE</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">event_hour / event_dow</span><span class="col-type">INT / VARCHAR</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">event_month / month_name</span><span class="col-type">INT / VARCHAR</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">funnel_source</span><span class="col-type">VARCHAR</span><span class="col-note">= 'swayo_app'</span></div>
+    </div>
+  </div>
+
+  <!-- fact_funnel_wa -->
+  <div class="tcard event" id="fact_funnel_wa" style="left:1000px;top:380px">
+    <div class="thead">
+      <div class="thead-icon"></div>
+      <div><div class="thead-name">fact_funnel_wa</div><span class="thead-type">Fact — WhatsApp Funnel</span></div>
+    </div>
+    <div class="tcols">
+      <div class="tcol is-pk"><span class="col-key"><span class="pk-badge">PK</span></span>
+        <span class="col-name">row_id</span><span class="col-type">INT</span>
+      </div>
+      <div class="tcol is-fk" data-tip="FOREIGN KEY → dim_restaurants.shop_id — NULL for VIEW_CATALOG/QUERY events without shop context">
+        <span class="col-key"><span class="fk-badge">FK</span></span>
+        <span class="col-name">shop_id</span><span class="col-type">VARCHAR</span><span class="col-note">nullable</span>
+      </div>
+      <div class="tcol is-fk" data-tip="SOFT FK → dim_customers.customer_contact — JOIN for campaign attribution analysis">
+        <span class="col-key"><span class="fk-badge">FK</span></span>
+        <span class="col-name">customer_contact</span><span class="col-type">VARCHAR(10)</span>
+      </div>
+      <div class="tcol is-fk" data-tip="FOREIGN KEY → fact_campaigns.campaign_id — links funnel events back to which campaign triggered them">
+        <span class="col-key"><span class="fk-badge">FK</span></span>
+        <span class="col-name">campaign_id</span><span class="col-type">VARCHAR</span>
+      </div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">action</span><span class="col-type">VARCHAR</span><span class="col-note">VIEW_CATALOG|TOFU|VIEW_CART|CHECKOUT|ORDER|QUERY</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">action_order</span><span class="col-type">INT</span><span class="col-note">1–6</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">customer_name</span><span class="col-type">VARCHAR</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">restaurant_name</span><span class="col-type">VARCHAR</span><span class="col-note">denorm</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">shop_code</span><span class="col-type">VARCHAR</span><span class="col-note">WA shop identifier</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">wa_message</span><span class="col-type">TEXT</span><span class="col-note">hi|hello|menu…</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">timestamp / event_date</span><span class="col-type">DATETIME / DATE</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">event_hour / event_dow</span><span class="col-type">INT / VARCHAR</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">funnel_source</span><span class="col-type">VARCHAR</span><span class="col-note">= 'whatsapp'</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">status</span><span class="col-type">VARCHAR</span><span class="col-note">= 'SUCCESS'</span></div>
+    </div>
+  </div>
+
+  <!-- ════════ FACT (CAMPAIGN) ════════ -->
+
+  <!-- fact_campaigns -->
+  <div class="tcard camp" id="fact_campaigns" style="left:1000px;top:740px">
+    <div class="thead">
+      <div class="thead-icon"></div>
+      <div><div class="thead-name">fact_campaigns</div><span class="thead-type">Fact — Campaign Recipients</span></div>
+    </div>
+    <div class="tcols">
+      <div class="tcol is-pk" data-tip="Composite PK — (campaign_name, campaign_id) uniquely identifies a campaign batch">
+        <span class="col-key"><span class="pk-badge">PK</span></span>
+        <span class="col-name">campaign_name</span><span class="col-type">VARCHAR</span><span class="col-note">from filename</span>
+      </div>
+      <div class="tcol is-pk">
+        <span class="col-key"><span class="pk-badge">PK</span></span>
+        <span class="col-name">campaign_id</span><span class="col-type">VARCHAR</span><span class="col-note">e.g. campaign_177…</span>
+      </div>
+      <div class="tcol is-fk" data-tip="FOREIGN KEY → dim_customers.customer_contact — JOIN to get customer segment, lifetime orders for non-converters analysis">
+        <span class="col-key"><span class="fk-badge">FK</span></span>
+        <span class="col-name">mobile_number</span><span class="col-type">VARCHAR(10)</span>
+      </div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">scheduled_date</span><span class="col-type">VARCHAR</span><span class="col-note">YYYY-MM-DD string</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">scheduled_time / scheduled_at</span><span class="col-type">VARCHAR / DATETIME</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">sent_at</span><span class="col-type">DATETIME</span><span class="col-note">nullable</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">delivered_at</span><span class="col-type">DATETIME</span><span class="col-note">nullable</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">read_at</span><span class="col-type">DATETIME</span><span class="col-note">nullable</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">is_sent / is_delivered / is_read</span><span class="col-type">INT(0/1)</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">delivery_status</span><span class="col-type">VARCHAR</span><span class="col-note">Read|Delivered|Sent|Failed</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">pitch_response</span><span class="col-type">FLOAT</span><span class="col-note">currently NULL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">loaded_at</span><span class="col-type">DATETIME</span></div>
+    </div>
+  </div>
+
+  <!-- ════════ AGGREGATES ════════ -->
+
+  <!-- agg_platform_daily -->
+  <div class="tcard agg" id="agg_platform_daily" style="left:30px;top:570px">
+    <div class="thead">
+      <div class="thead-icon"></div>
+      <div><div class="thead-name">agg_platform_daily</div><span class="thead-type">Aggregate — Platform KPIs</span></div>
+    </div>
+    <div class="tcols">
+      <div class="tcol is-pk" data-tip="Composite PK — (platform, order_date) — refreshed daily by pipeline">
+        <span class="col-key"><span class="pk-badge">PK</span></span>
+        <span class="col-name">platform</span><span class="col-type">VARCHAR</span>
+      </div>
+      <div class="tcol is-pk">
+        <span class="col-key"><span class="pk-badge">PK</span></span>
+        <span class="col-name">order_date</span><span class="col-type">DATE</span>
+      </div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">gmv</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">net_revenue</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">order_count</span><span class="col-type">INT</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">avg_order_value</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">discount_given</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">coupon_orders</span><span class="col-type">INT</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">cancelled_count</span><span class="col-type">INT</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">cancellation_rate</span><span class="col-type">DECIMAL</span></div>
+    </div>
+  </div>
+
+  <!-- agg_restaurant_daily -->
+  <div class="tcard agg" id="agg_restaurant_daily" style="left:310px;top:540px">
+    <div class="thead">
+      <div class="thead-icon"></div>
+      <div><div class="thead-name">agg_restaurant_daily</div><span class="thead-type">Aggregate — Restaurant KPIs</span></div>
+    </div>
+    <div class="tcols">
+      <div class="tcol is-fk" data-tip="FOREIGN KEY → dim_restaurants.shop_id — used to enrich with city and pincode in /api/restaurants">
+        <span class="col-key"><span class="fk-badge">FK</span></span>
+        <span class="col-name">shop_id</span><span class="col-type">VARCHAR</span>
+      </div>
+      <div class="tcol is-pk">
+        <span class="col-key"><span class="pk-badge">PK</span></span>
+        <span class="col-name">order_date</span><span class="col-type">DATE</span>
+      </div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">restaurant_name</span><span class="col-type">VARCHAR</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">platform</span><span class="col-type">VARCHAR</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">gmv / net_revenue</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">order_count</span><span class="col-type">INT</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">avg_order_value</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">discount_given</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">coupon_orders</span><span class="col-type">INT</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">cancelled_count</span><span class="col-type">INT</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">cancellation_rate</span><span class="col-type">DECIMAL</span></div>
+    </div>
+  </div>
+
+  <!-- agg_funnel_conversion -->
+  <div class="tcard agg" id="agg_funnel_conversion" style="left:620px;top:540px">
+    <div class="thead">
+      <div class="thead-icon"></div>
+      <div><div class="thead-name">agg_funnel_conversion</div><span class="thead-type">Aggregate — Funnel Rates</span></div>
+    </div>
+    <div class="tcols">
+      <div class="tcol is-fk" data-tip="FOREIGN KEY → dim_restaurants.shop_id — per-shop funnel conversion rates">
+        <span class="col-key"><span class="fk-badge">FK</span></span>
+        <span class="col-name">shop_id</span><span class="col-type">VARCHAR</span>
+      </div>
+      <div class="tcol is-pk">
+        <span class="col-key"><span class="pk-badge">PK</span></span>
+        <span class="col-name">event_date</span><span class="col-type">DATE</span>
+      </div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">pdp_views</span><span class="col-type">INT</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">plp_views</span><span class="col-type">INT</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">cart_views</span><span class="col-type">INT</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">checkouts</span><span class="col-type">INT</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">orders_placed</span><span class="col-type">INT</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">plp_to_cart_rate</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">cart_to_checkout_rate</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">checkout_to_order_rate</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">overall_conversion_rate</span><span class="col-type">DECIMAL</span></div>
+    </div>
+  </div>
+
+  <!-- agg_customer_behavior -->
+  <div class="tcard agg" id="agg_customer_behavior" style="left:620px;top:820px">
+    <div class="thead">
+      <div class="thead-icon"></div>
+      <div><div class="thead-name">agg_customer_behavior</div><span class="thead-type">Aggregate — Customer Segments</span></div>
+    </div>
+    <div class="tcols">
+      <div class="tcol is-pk is-fk" data-tip="PK + FOREIGN KEY → dim_customers.customer_contact — one row per customer">
+        <span class="col-key"><span class="pk-badge">PK</span></span>
+        <span class="col-name">customer_contact</span><span class="col-type">VARCHAR(10)</span>
+      </div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">total_orders</span><span class="col-type">INT</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">total_gmv</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">avg_order_value</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">total_discount</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">first_order_date</span><span class="col-type">DATE</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">last_order_date</span><span class="col-type">DATE</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">platforms_used</span><span class="col-type">INT</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">cancelled_orders</span><span class="col-type">INT</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">coupon_usage</span><span class="col-type">INT</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">customer_segment</span><span class="col-type">VARCHAR</span><span class="col-note">VIP|Loyal|Repeat|One-time</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">cancellation_rate</span><span class="col-type">DECIMAL</span></div>
+    </div>
+  </div>
+
+  <!-- agg_campaign_performance -->
+  <div class="tcard agg" id="agg_campaign_performance" style="left:1000px;top:1040px">
+    <div class="thead">
+      <div class="thead-icon"></div>
+      <div><div class="thead-name">agg_campaign_performance</div><span class="thead-type">Aggregate — Campaign KPIs</span></div>
+    </div>
+    <div class="tcols">
+      <div class="tcol is-pk">
+        <span class="col-key"><span class="pk-badge">PK</span></span>
+        <span class="col-name">campaign_name</span><span class="col-type">VARCHAR</span>
+      </div>
+      <div class="tcol is-pk">
+        <span class="col-key"><span class="pk-badge">PK</span></span>
+        <span class="col-name">campaign_id</span><span class="col-type">VARCHAR</span>
+      </div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">scheduled_date</span><span class="col-type">VARCHAR</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">total_recipients</span><span class="col-type">INT</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">sent_count / delivered_count</span><span class="col-type">INT</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">read_count</span><span class="col-type">INT</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">sent_rate_pct / delivered_rate_pct</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">read_rate_pct</span><span class="col-type">DECIMAL</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">orders_after_24h</span><span class="col-type">INT</span><span class="col-note">attribution window</span></div>
+      <div class="tcol"><span class="col-key"></span><span class="col-name">conversion_rate_pct</span><span class="col-type">DECIMAL</span></div>
+    </div>
+  </div>
+
+</div><!-- /canvas -->
+</div><!-- /canvas-wrap -->
+
+<!-- Tooltip -->
+<div class="tip" id="tip"></div>
+
+<!-- Controls -->
+<div class="controls">
+  <button class="ctrl-btn" onclick="zoom(1.15)" title="Zoom in">+</button>
+  <button class="ctrl-btn" onclick="zoom(0.87)" title="Zoom out">−</button>
+  <button class="ctrl-btn" onclick="resetZoom()" title="Reset">↺</button>
+  <button class="ctrl-btn" onclick="resetLayout()" title="Reset layout">⟲</button>
+</div>
+
+<script>
+// ── TOOLTIP ──────────────────────────────────────────────────────────────────
+const tip = document.getElementById('tip');
+document.querySelectorAll('[data-tip]').forEach(el => {
+  el.addEventListener('mouseenter', e => {
+    tip.textContent = el.dataset.tip;
+    tip.style.display = 'block';
+  });
+  el.addEventListener('mousemove', e => {
+    tip.style.left = (e.clientX + 14) + 'px';
+    tip.style.top  = (e.clientY - 10) + 'px';
+  });
+  el.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+});
+
+// ── ZOOM ──────────────────────────────────────────────────────────────────────
+let scale = 1;
+const canvas = document.getElementById('canvas');
+function zoom(factor) {
+  scale = Math.min(Math.max(scale * factor, 0.35), 2.2);
+  canvas.style.transform = `scale(${scale})`;
+  canvas.style.transformOrigin = 'top left';
+}
+function resetZoom() { scale = 1; canvas.style.transform = 'scale(1)'; }
+
+// ── TABLE DRAGGING ───────────────────────────────────────────────────────────
+const layoutKey = 'schema-table-layout-v1';
+const defaultPositions = {};
+const dragState = { active:false, id:null, startX:0, startY:0, left:0, top:0, raf:0 };
+
+function captureDefaultPositions() {
+  document.querySelectorAll('.tcard').forEach(card => {
+    defaultPositions[card.id] = {
+      left: card.style.left,
+      top: card.style.top
+    };
+  });
+}
+
+function saveLayout() {
+  const layout = {};
+  document.querySelectorAll('.tcard').forEach(card => {
+    layout[card.id] = { left: card.style.left, top: card.style.top };
+  });
+  localStorage.setItem(layoutKey, JSON.stringify(layout));
+}
+
+function applyLayout(layout) {
+  if (!layout) return;
+  document.querySelectorAll('.tcard').forEach(card => {
+    const pos = layout[card.id];
+    if (pos?.left && pos?.top) {
+      card.style.left = pos.left;
+      card.style.top = pos.top;
+    }
+  });
+}
+
+function resetLayout() {
+  localStorage.removeItem(layoutKey);
+  applyLayout(defaultPositions);
+  drawJoins();
+}
+
+function getCanvasPoint(e) {
+  const wrap = document.getElementById('canvas-wrap');
+  const rect = wrap.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left + wrap.scrollLeft) / scale,
+    y: (e.clientY - rect.top + wrap.scrollTop) / scale,
+  };
+}
+
+function setupDragging() {
+  document.querySelectorAll('.tcard').forEach(card => {
+    const header = card.querySelector('.thead');
+    if (!header || header.dataset.dragReady === '1') return;
+    header.dataset.dragReady = '1';
+
+    header.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      card.classList.add('dragging');
+      card.style.zIndex = 60;
+      dragState.active = true;
+      dragState.id = card.id;
+      dragState.left = parseFloat(card.style.left) || 0;
+      dragState.top = parseFloat(card.style.top) || 0;
+      const p = getCanvasPoint(e);
+      dragState.startX = p.x;
+      dragState.startY = p.y;
+      header.setPointerCapture?.(e.pointerId);
+    });
+  });
+
+  window.addEventListener('pointermove', e => {
+    if (!dragState.active || !dragState.id) return;
+    const card = document.getElementById(dragState.id);
+    if (!card) return;
+    const p = getCanvasPoint(e);
+    const dx = p.x - dragState.startX;
+    const dy = p.y - dragState.startY;
+    card.style.left = `${dragState.left + dx}px`;
+    card.style.top = `${dragState.top + dy}px`;
+    if (!dragState.raf) {
+      dragState.raf = requestAnimationFrame(() => {
+        dragState.raf = 0;
+        drawJoins();
+      });
+    }
+  });
+
+  window.addEventListener('pointerup', () => {
+    if (!dragState.active) return;
+    const card = dragState.id ? document.getElementById(dragState.id) : null;
+    if (card) card.classList.remove('dragging');
+    dragState.active = false;
+    dragState.id = null;
+    dragState.left = 0;
+    dragState.top = 0;
+    if (dragState.raf) {
+      cancelAnimationFrame(dragState.raf);
+      dragState.raf = 0;
+    }
+    saveLayout();
+    drawJoins();
+  });
+}
+
+// ── DRAW JOIN LINES ───────────────────────────────────────────────────────────
+// Each join: { from: tableId, to: tableId, label, fromAnchor, toAnchor, style }
+// fromAnchor/toAnchor: 'right'|'left'|'bottom'|'top'
+// We'll compute center-edge positions after layout
+
+const joins = [
+  // CORE JOINS from dim_restaurants
+  { from:'dim_restaurants',      to:'fact_orders',           label:'shop_id',          style:'dim',    fa:'right', ta:'left' },
+  { from:'dim_restaurants',      to:'agg_restaurant_daily',  label:'shop_id',          style:'dim',    fa:'bottom', ta:'top' },
+  { from:'dim_restaurants',      to:'agg_funnel_conversion', label:'shop_id',          style:'dim',    fa:'bottom', ta:'top' },
+  { from:'dim_restaurants',      to:'fact_funnel',           label:'shop_id',          style:'dim',    fa:'right', ta:'left' },
+  { from:'dim_restaurants',      to:'fact_funnel_wa',        label:'shop_id',          style:'dim',    fa:'right', ta:'left' },
+
+  // CORE JOINS from dim_customers
+  { from:'dim_customers',        to:'fact_orders',           label:'customer_contact', style:'dim',    fa:'right', ta:'left' },
+  { from:'dim_customers',        to:'fact_order_geo',        label:'customer_contact', style:'dim',    fa:'bottom', ta:'left' },
+  { from:'dim_customers',        to:'fact_campaigns',        label:'mobile_number',    style:'dim',    fa:'right', ta:'left' },
+  { from:'dim_customers',        to:'agg_customer_behavior', label:'customer_contact', style:'dim',    fa:'bottom', ta:'top' },
+
+  // FACT JOINS from fact_orders
+  { from:'fact_orders',          to:'fact_order_items',      label:'order_id',         style:'strong', fa:'bottom', ta:'top' },
+  { from:'fact_orders',          to:'fact_order_geo',        label:'order_id',         style:'strong', fa:'bottom', ta:'top' },
+
+  // CAMPAIGN JOIN
+  { from:'fact_campaigns',       to:'fact_funnel_wa',        label:'campaign_id',      style:'camp',   fa:'top', ta:'bottom' },
+];
+
+function getCenter(id, anchor) {
+  const el = document.getElementById(id);
+  if (!el) return {x:0, y:0};
+  const l = parseInt(el.style.left);
+  const t = parseInt(el.style.top);
+  const w = el.offsetWidth;
+  const h = el.offsetHeight;
+  switch(anchor) {
+    case 'right':  return { x: l + w, y: t + h/2 };
+    case 'left':   return { x: l,     y: t + h/2 };
+    case 'top':    return { x: l + w/2, y: t };
+    case 'bottom': return { x: l + w/2, y: t + h };
+  }
+  return { x: l + w/2, y: t + h/2 };
+}
+
+function drawJoins() {
+  const svg = document.getElementById('join-svg');
+  // Update SVG viewBox to match canvas
+  const cw = canvas.scrollWidth, ch = canvas.scrollHeight;
+  svg.setAttribute('viewBox', `0 0 ${cw} ${ch}`);
+  svg.setAttribute('width', cw);
+  svg.setAttribute('height', ch);
+  svg.innerHTML = '';
+
+  const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+  ['join','strong','dim','camp'].forEach(type => {
+    const col = type==='strong'?'#2563a8':type==='dim'?'#2e7d46':type==='camp'?'#b5561c':'#8a7968';
+    const mk = document.createElementNS('http://www.w3.org/2000/svg','marker');
+    mk.setAttribute('id',`arrow-${type}`);
+    mk.setAttribute('markerWidth','8');
+    mk.setAttribute('markerHeight','8');
+    mk.setAttribute('refX','6');
+    mk.setAttribute('refY','3');
+    mk.setAttribute('orient','auto');
+    const poly = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    poly.setAttribute('points','0 0, 6 3, 0 6');
+    poly.setAttribute('fill',col);
+    poly.setAttribute('opacity','0.7');
+    mk.appendChild(poly);
+    defs.appendChild(mk);
+
+    const mkC = document.createElementNS('http://www.w3.org/2000/svg','marker');
+    mkC.setAttribute('id',`circle-${type}`);
+    mkC.setAttribute('markerWidth','6');
+    mkC.setAttribute('markerHeight','6');
+    mkC.setAttribute('refX','3');
+    mkC.setAttribute('refY','3');
+    mkC.setAttribute('orient','auto');
+    const circ = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circ.setAttribute('cx','3');
+    circ.setAttribute('cy','3');
+    circ.setAttribute('r','2.5');
+    circ.setAttribute('fill',col);
+    circ.setAttribute('opacity','0.6');
+    mkC.appendChild(circ);
+    defs.appendChild(mkC);
+  });
+  svg.appendChild(defs);
+
+  joins.forEach(j => {
+    const from = getCenter(j.from, j.fa);
+    const to   = getCenter(j.to,   j.ta);
+    if (!from || !to) return;
+
+    const type = j.style || 'join';
+    const col  = type==='strong'?'#2563a8':type==='dim'?'#2e7d46':type==='camp'?'#b5561c':'#8a7968';
+    const w    = type==='strong'?2.2:type==='dim'?2:1.4;
+    const op   = type==='strong'?0.75:type==='dim'?0.65:0.5;
+
+    const dx = to.x - from.x, dy = to.y - from.y;
+    let cpx1, cpy1, cpx2, cpy2;
+
+    if (j.fa === 'right' && j.ta === 'left') {
+      cpx1 = from.x + Math.abs(dx)*0.45; cpy1 = from.y;
+      cpx2 = to.x   - Math.abs(dx)*0.45; cpy2 = to.y;
+    } else if (j.fa === 'bottom' && j.ta === 'top') {
+      cpx1 = from.x; cpy1 = from.y + Math.abs(dy)*0.5;
+      cpx2 = to.x;   cpy2 = to.y   - Math.abs(dy)*0.5;
+    } else if (j.fa === 'bottom' && j.ta === 'left') {
+      cpx1 = from.x; cpy1 = from.y + 60;
+      cpx2 = to.x - 60; cpy2 = to.y;
+    } else if (j.fa === 'right' && j.ta === 'bottom') {
+      cpx1 = from.x + 80; cpy1 = from.y;
+      cpx2 = to.x; cpy2 = to.y + 80;
+    } else if (j.fa === 'top' && j.ta === 'bottom') {
+      cpx1 = from.x; cpy1 = from.y - Math.abs(dy)*0.5;
+      cpx2 = to.x;   cpy2 = to.y   + Math.abs(dy)*0.5;
+    } else {
+      cpx1 = from.x + dx*0.4; cpy1 = from.y;
+      cpx2 = to.x   - dx*0.4; cpy2 = to.y;
+    }
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', `M ${from.x} ${from.y} C ${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${to.x} ${to.y}`);
+    path.setAttribute('stroke', col);
+    path.setAttribute('stroke-width', w);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('opacity', op);
+    path.setAttribute('marker-end', `url(#arrow-${type})`);
+    path.setAttribute('marker-start', `url(#circle-${type})`);
+    path.style.transition = 'opacity .2s';
+
+    // Hover highlight
+    const hitPath = document.createElementNS('http://www.w3.org/2000/svg','path');
+    hitPath.setAttribute('d', path.getAttribute('d'));
+    hitPath.setAttribute('stroke', 'transparent');
+    hitPath.setAttribute('stroke-width', '12');
+    hitPath.setAttribute('fill', 'none');
+    hitPath.style.cursor = 'pointer';
+    hitPath.setAttribute('data-label', j.label);
+    hitPath.addEventListener('mouseenter', e => {
+      path.setAttribute('opacity','1');
+      path.setAttribute('stroke-width', String(Number(w)+1.5));
+      tip.textContent = `JOIN on: ${j.label}  (${j.from} → ${j.to})`;
+      tip.style.display = 'block';
+    });
+    hitPath.addEventListener('mousemove', e => {
+      tip.style.left = (e.clientX + 14) + 'px';
+      tip.style.top  = (e.clientY - 10) + 'px';
+    });
+    hitPath.addEventListener('mouseleave', () => {
+      path.setAttribute('opacity', op);
+      path.setAttribute('stroke-width', w);
+      tip.style.display = 'none';
+    });
+
+    svg.appendChild(path);
+    svg.appendChild(hitPath);
+
+    // Label chip on line midpoint
+    const bx = 0.125*from.x + 0.375*cpx1 + 0.375*cpx2 + 0.125*to.x;
+    const by = 0.125*from.y + 0.375*cpy1 + 0.375*cpy2 + 0.125*to.y;
+
+    const fo = document.createElementNS('http://www.w3.org/2000/svg','foreignObject');
+    fo.setAttribute('x', bx - 40);
+    fo.setAttribute('y', by - 10);
+    fo.setAttribute('width', '90');
+    fo.setAttribute('height', '20');
+    fo.innerHTML = `<div xmlns="http://www.w3.org/1999/xhtml" style="
+      background:var(--paper);border:1px solid ${col};color:${col};
+      font-family:'JetBrains Mono',monospace;font-size:8px;
+      padding:1px 5px;border-radius:3px;white-space:nowrap;
+      opacity:0.85;text-align:center;letter-spacing:.3px;
+    ">${j.label}</div>`;
+    svg.appendChild(fo);
+  });
+
+  // Expand canvas height if needed
+  let maxBottom = 0;
+  document.querySelectorAll('.tcard').forEach(tc => {
+    const b = parseInt(tc.style.top) + tc.offsetHeight;
+    if (b > maxBottom) maxBottom = b;
+  });
+  canvas.style.minHeight = (maxBottom + 60) + 'px';
+}
+
+// Wait for fonts + layout
+window.addEventListener('load', () => {
+  captureDefaultPositions();
+  applyLayout(JSON.parse(localStorage.getItem(layoutKey) || 'null'));
+  setupDragging();
+  setTimeout(drawJoins, 200);
+  window.addEventListener('resize', drawJoins);
+});
+</script>
+</body>
+</html>

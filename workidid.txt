@@ -30,3 +30,21 @@ Added Smart Comparison + Daily tables
 7️⃣ Backend (server.js)
 Added byRestaurantDaily endpoint data for comparison
 Added byRestaurantMonthly endpoint data (later removed from UI)
+
+Session Summary — Export Page Upgrade - 2026-04-08
+1) Rebuilt export page UI (cleaner dark theme, card layout, better readability).
+2) Improved export functionality:
+   - Added preview search.
+   - Added sortable table headers.
+   - Added column visibility toggles.
+   - Added clear filters action.
+   - Added persisted filters/sort via localStorage.
+   - Added validation for date range and min/max orders.
+3) Improved download flow:
+   - Switched to fetch + blob based downloads.
+   - Added export status + better error handling in UI.
+4) Fixed loading issue on localhost:3002:
+   - Copied updated file to public/export.html so Express static serving works.
+5) Verified:
+   - /export.html responds with HTTP 200 on port 3002.
+   - Embedded JS syntax check passed.

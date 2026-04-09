@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Swayo Dashboard - Deep Detailed Architecture</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#0b1220;--panel:#111a2e;--panel2:#16213a;--line:#2a3b62;--text:#dfe9ff;--muted:#8ca3cf;--ok:#34d399;--api:#60a5fa;--svc:#a78bfa;--db:#fb923c;--warn:#fca5a5}
+    body{background:linear-gradient(180deg,#0a1020 0%,#0b1220 100%);color:var(--text);font-family:Inter,Segoe UI,system-ui,sans-serif;padding:20px}
+    .wrap{max-width:1700px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+    .hero{background:linear-gradient(135deg,#111a2e,#1a2650);border:1px solid var(--line);border-radius:14px;padding:18px}
+    .title{font-size:30px;font-weight:800}.title span{color:var(--ok)}
+    .sub{margin-top:7px;color:var(--muted);font-size:13px;line-height:1.55}
+    .stats{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:10px;margin-top:14px}
+    .stat{background:#0f1730;border:1px solid var(--line);border-radius:10px;padding:9px}.stat .n{font-size:20px;font-weight:800;color:var(--ok)}.stat .l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px}
+
+    .tabs,.subtabs{display:flex;gap:8px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
+    .subtabs{background:transparent;border:none;padding:0}
+    .btn{cursor:pointer;border:1px solid #365184;background:#131d36;color:#c4d8fb;border-radius:8px;padding:7px 10px;font-size:12px;font-weight:600}
+    .btn.active{background:#23427c;border-color:#6b95e8;color:#eef5ff}
+
+    .pane{display:none}.pane.active{display:flex;flex-direction:column;gap:12px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+    .h{font-size:16px;font-weight:700;margin-bottom:8px}.h small{font-size:12px;color:var(--muted);font-weight:500}
+    .desc{font-size:12px;color:#c9d9f6;line-height:1.6;margin-bottom:8px}
+
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th,td{border:1px solid #2e436f;padding:8px;text-align:left;vertical-align:top}
+    th{background:#12203f;color:#d0e3ff;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+    td{color:#c7d8f8;line-height:1.5}
+
+    .code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:#d4e6ff}
+    .chip{display:inline-block;font-size:10px;padding:3px 7px;border-radius:999px;border:1px solid #355183;background:#0e1933;color:#c5daff;margin:2px 4px 2px 0}
+    .pill{display:inline-block;font-size:10px;padding:3px 7px;border-radius:999px;border:1px solid transparent}
+    .api{background:rgba(96,165,250,.15);border-color:rgba(96,165,250,.45);color:#bfdcff}
+    .svc{background:rgba(167,139,250,.15);border-color:rgba(167,139,250,.45);color:#dfd0ff}
+    .db{background:rgba(251,146,60,.15);border-color:rgba(251,146,60,.45);color:#ffd7b4}
+    .warn{color:var(--warn)}
+    .sql{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.45;color:#d7e7ff}
+    .flow{display:grid;grid-template-columns:repeat(6,minmax(180px,1fr));gap:8px}
+    .step{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px;font-size:11px;line-height:1.45;color:#ccdbf7}
+    .step b{color:#fff;font-size:11px}
+
+    @media(max-width:1300px){.stats{grid-template-columns:repeat(2,minmax(140px,1fr))}.flow{grid-template-columns:repeat(2,minmax(220px,1fr))}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <section class="hero">
+    <div class="title">Swayo Dashboard <span>Deep Detailed Architecture</span></div>
+    <div class="sub">This version is intentionally detailed. Each page tab contains: exact purpose, visible widgets, frontend function chain, API endpoints, backend query helpers, DB table/column usage, response contracts, complete flow steps, and debugging/failure checks.</div>
+    <div class="stats">
+      <div class="stat"><div class="n">14</div><div class="l">Page-level tabs</div></div>
+      <div class="stat"><div class="n">30+</div><div class="l">Mapped endpoints</div></div>
+      <div class="stat"><div class="n">72 x 12</div><div class="l">KPI analysis lens</div></div>
+      <div class="stat"><div class="n">100%</div><div class="l">Flow mapped</div></div>
+    </div>
+  </section>
+
+  <div class="tabs">
+    <button class="btn active" onclick="mainTab('pages',this)">Pages (Deep Detail)</button>
+    <button class="btn" onclick="mainTab('features',this)">Extra Features</button>
+    <button class="btn" onclick="mainTab('global',this)">Global Filter + Runtime</button>
+  </div>
+
+  <div id="main-pages" class="pane active">
+    <section class="card">
+      <div class="h">Page Tabs <small>one tab = one page = complete technical explanation</small></div>
+      <div class="subtabs" id="page-tab-buttons"></div>
+    </section>
+
+    <section class="card">
+      <div class="h" id="page-title"></div>
+      <div class="desc" id="page-purpose"></div>
+
+      <table>
+        <thead><tr><th>UI Blocks (what user sees)</th><th>Frontend Functions (execution chain)</th><th>API Calls</th></tr></thead>
+        <tbody id="ui-api-body"></tbody>
+      </table>
+
+      <div style="height:10px"></div>
+
+      <table>
+        <thead><tr><th>Backend route + query helpers</th><th>DB tables</th><th>DB columns used</th><th>Returned payload fields</th></tr></thead>
+        <tbody id="backend-db-body"></tbody>
+      </table>
+
+      <div style="height:10px"></div>
+
+      <div class="h" style="font-size:14px">Actual SQL Queries Used by This Page</div>
+      <table>
+        <thead><tr><th>API / Function</th><th>SQL (from server.js)</th><th>Why it runs</th></tr></thead>
+        <tbody id="query-body"></tbody>
+      </table>
+
+      <div style="height:10px"></div>
+
+      <div class="h" style="font-size:14px">Page Flow (step-by-step)</div>
+      <div class="flow" id="flow-box"></div>
+
+      <div style="height:10px"></div>
+
+      <table>
+        <thead><tr><th>Validation / Failure points</th><th>How to debug quickly</th></tr></thead>
+        <tbody id="debug-body"></tbody>
+      </table>
+    </section>
+  </div>
+
+  <div id="main-features" class="pane">
+    <section class="card">
+      <div class="h">Extra Features (Detailed)</div>
+      <table>
+        <thead><tr><th>Feature</th><th>Implementation reference</th><th>Detailed explanation</th><th>Operational benefit</th></tr></thead>
+        <tbody>
+          <tr><td>Dark / Light Mode</td><td class="code">initTheme(), applyTheme(), toggleTheme() in dashboard.js</td><td>Theme is initialized on load, saved in localStorage, and can follow system preference. UI tokens are switched without reloading data, so charts and tables stay intact.</td><td>Comfortable day/night usage and less analyst fatigue.</td></tr>
+          <tr><td>Global filter contract</td><td class="code">fp() in dashboard.js + ordersWhere()/multiIn() in server.js</td><td>Single query param builder on frontend; backend uses shared SQL helper, so all pages interpret filters consistently. This avoids page-to-page mismatch bugs.</td><td>Reliable cross-tab comparisons.</td></tr>
+          <tr><td>Multi-select filter engine</td><td class="code">multi-select UI helpers + multiIn()</td><td>Platform/restaurant selections are serialized as comma-separated values then converted into SQL IN placeholders safely.</td><td>Flexible segmentation with secure SQL.</td></tr>
+          <tr><td>Modal drilldown</td><td class="code">openModal(), showDrillOrders(), /api/drill</td><td>Chart click opens order-level data behind aggregated metric. Drill inherits current global filters so context remains consistent.</td><td>Fast root-cause investigation.</td></tr>
+          <tr><td>Export engine</td><td class="code">buildExportQuery(), toCSV(), toExcel(), /api/export/*</td><td>Preview-first approach reduces bad exports; final download supports CSV/XLS with typed formatting and headers.</td><td>Operations-friendly data sharing.</td></tr>
+          <tr><td>Health indicator</td><td class="code">/api/health + db-dot status in nav</td><td>UI reflects DB/API status early; if failed, users immediately know backend is unhealthy before assuming chart logic is broken.</td><td>Quicker incident triage.</td></tr>
+          <tr><td>Custom tooltip system</td><td class="code">initTooltip(), showTooltip(), hideTooltip()</td><td>Single tooltip behavior for charts/cards/modals avoids browser-native inconsistencies and double tooltip bugs.</td><td>Cleaner UX and fewer confusion points.</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <div id="main-global" class="pane">
+    <section class="card">
+      <div class="h">Global Filter + Runtime Architecture</div>
+      <table>
+        <thead><tr><th>Filter/Input</th><th>Frontend source</th><th>Backend mapping</th><th>SQL pattern</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>from / to</td><td class="code">#f-from / #f-to</td><td class="code">ordersWhere(query)</td><td class="code">order_date &gt;= ? AND order_date &lt;= ?</td><td>Core date scoping for almost every tab.</td></tr>
+          <tr><td>platform</td><td class="code">ms-plat multi-select</td><td class="code">multiIn(canonicalPlatformExpr, platform)</td><td class="code">IN (?, ?, ...)</td><td>Handles gf_whatsapp/swayo_whatsapp/swayo_app.</td></tr>
+          <tr><td>shop_id</td><td class="code">ms-rest multi-select</td><td class="code">multiIn(shop_id, shop_id)</td><td class="code">IN (?, ?, ...)</td><td>Restaurant-specific cuts and drilldowns.</td></tr>
+          <tr><td>order_status, delivery_type, has_coupon</td><td>dropdowns</td><td>route-level conditions</td><td class="code">= ?</td><td>Frequently used in Orders/Export/Coupon views.</td></tr>
+        </tbody>
+      </table>
+
+      <div style="height:10px"></div>
+
+      <table>
+        <thead><tr><th>Runtime area</th><th>Current implementation</th><th>Important check</th></tr></thead>
+        <tbody>
+          <tr><td>Static page hosting</td><td class="code">express.static("public")</td><td>Pages must be in <code>public/</code> to load.</td></tr>
+          <tr><td>API host behavior</td><td>frontend uses host-aware API base</td><td>Confirm port/host alignment in browser URL.</td></tr>
+          <tr><td>DB connectivity</td><td class="code">/api/health</td><td>Use first when all pages show loading/fail.</td></tr>
+          <tr><td>Export safety</td><td>limit caps + parameterized queries</td><td>Prevents huge accidental downloads/injection risk.</td></tr>
+          <tr><td class="warn">Common breakpoints</td><td class="warn">wrong static path, env misconfig, invalid date windows, DB outage</td><td class="warn">Check browser network + health endpoint + server logs.</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+</div>
+
+<script>
+const PAGE_DATA = {
+  overview: {
+    title: 'Overview Page (Deep Technical Detail)',
+    purpose: 'Overview is the KPI command center. It gives immediate business status using aggregated order metrics, trend lines, platform share, delivery mix, and temporal behavior (hour/day). It is the first page loaded and sets baseline interpretation for all other tabs.',
+    uiApi: [
+      ['KPI cards: GMV, net revenue, orders, AOV, cancellation, coupon', 'loadOverview() -> render KPI widgets', 'GET /api/overview'],
+      ['MoM and DoD charts', 'renderTrendSVG(), renderDailyChart()', 'GET /api/overview'],
+      ['Platform donut + comparison', 'renderDonut(), renderPlatformPage()', 'GET /api/overview'],
+      ['Hourly and DoW patterns', 'renderHourChart(), bars rendering', 'GET /api/overview']
+    ],
+    backend: [
+      ['Route: /api/overview; helpers: ordersWhere(), canonicalPlatformExpr()', 'fact_orders, dim_customers, dim_restaurants', 'order_id, order_date, order_value, net_revenue, has_coupon, is_cancelled, order_hour, order_dow, delivery_type, shop_id, customer_contact', 'kpis, monthly, daily, dailyByPlatform, platforms, dow, hourly, delivery']
+    ],
+    flow: [
+      'User lands on dashboard and default filters initialize.',
+      'loadOverview() triggers /api/overview with fp() query string.',
+      'Server builds shared WHERE via ordersWhere().',
+      'SQL returns aggregated slices (monthly, daily, platform, hourly).',
+      'Frontend caches modal datasets and renders visual blocks.',
+      'Any filter change re-runs the same chain with new context.'
+    ],
+    debug: [
+      ['KPI values look stale or empty', 'Check /api/overview network response + verify from/to filter range + test /api/health'],
+      ['Platform split seems wrong', 'Confirm canonicalPlatformExpr mapping from order_id prefixes in backend']
+    ],
+    queries: [
+      ['GET /api/overview (kpis)', `SELECT
+  COALESCE(SUM(fo.order_value),0) AS total_gmv,
+  COALESCE(SUM(fo.net_revenue),0) AS total_net_revenue,
+  COUNT(DISTINCT fo.order_id) AS total_orders,
+  ROUND(AVG(fo.order_value),2) AS avg_order_value
+FROM (SELECT fo.*, ${'${platExpr}'} AS canonical_platform FROM fact_orders fo) fo
+WHERE ${'${where}'}`, 'Primary KPI cards'],
+      ['GET /api/overview (monthly)', `SELECT fo.order_year, fo.order_month,
+  COUNT(DISTINCT fo.order_id) AS orders,
+  SUM(fo.order_value) AS gmv
+FROM (SELECT fo.*, ${'${platExpr}'} AS canonical_platform FROM fact_orders fo) fo
+WHERE ${'${where}'}
+GROUP BY fo.order_year, fo.order_month
+ORDER BY fo.order_year, fo.order_month`, 'MoM trend lines'],
+      ['GET /api/overview (hourly)', `SELECT fo.order_hour, COUNT(DISTINCT fo.order_id) AS orders
+FROM (SELECT fo.*, ${'${platExpr}'} AS canonical_platform FROM fact_orders fo) fo
+WHERE ${'${where}'}
+GROUP BY fo.order_hour ORDER BY fo.order_hour`, 'Hourly activity bars']
+    ]
+  },
+  trends: {
+    title:'Trends Page',
+    purpose:'Trends focuses on longitudinal analysis: monthly movement, day-level volatility, AOV evolution, and product trend overlays.',
+    uiApi:[
+      ['Monthly trend chart + summary table','loadTrends() + renderMoMChart()','GET /api/overview'],
+      ['AOV chart + table','renderAOVChart(), renderAOVTable()','GET /api/aov_monthly'],
+      ['Trend items section','renderTrendItems()','GET /api/trend_items']
+    ],
+    backend:[
+      ['Routes: /api/overview, /api/aov_monthly, /api/trend_items','fact_orders, fact_order_items, dim_restaurants','order_month, order_year, order_date, order_value, platform, product_name, shop_id','overview slices + aov rows + item trend payload']
+    ],
+    flow:['loadTrends() runs Promise.all on 3 endpoints.','Response blocks are rendered independently for resilience.','Month navigation updates charts/tables for selected window.','Item trend section surfaces top SKUs and best restaurants.','Drill actions can link to order-level views.','Filters persist via fp() so trend context is consistent.'],
+    debug:[['AOV mismatch vs Overview','Compare date/filter context and confirm AOV formula source route is /api/aov_monthly'],['Trend items blank','Check fact_order_items availability for selected date window']],
+    queries:[
+      ['GET /api/aov_monthly', `SELECT fo.order_year, fo.order_month, ${'${platExpr}'} AS platform,
+  ROUND(AVG(fo.order_value),2) AS aov_gross,
+  ROUND(AVG(fo.order_value - COALESCE(fo.packing_charge,0) - COALESCE(fo.delivery_charge,0) - COALESCE(fo.convenience_charge,0) - COALESCE(fo.tax,0)),2) AS aov_food_only
+FROM fact_orders fo
+WHERE ${'${where}'}
+GROUP BY fo.order_year, fo.order_month, ${'${platExpr}'}`, 'AOV trend'],
+      ['GET /api/trend_items', `SELECT fo.order_date, i.product_name,
+  COUNT(DISTINCT fo.order_id) AS qty
+FROM fact_order_items i
+JOIN fact_orders fo ON fo.order_id = i.order_id
+WHERE ${'${where}'} AND i.product_name IS NOT NULL
+GROUP BY fo.order_date, i.product_name
+ORDER BY fo.order_date DESC, qty DESC`, 'Daily trending products']
+    ]
+  },
+  platform:{title:'Platform Page',purpose:'Compares performance across platform channels for operations and growth decisions.',uiApi:[['Platform comparison table + cards','loadPlatform() from overview payload','GET /api/overview']],backend:[['Route: /api/overview (platform section)','fact_orders','platform(canonical), order_value, net_revenue, has_coupon, is_cancelled, order_id','platforms[] with KPI fields']],flow:['Platform tab loads overview slice.','Rows are sorted by order volume/GMV.','Comparative rates are displayed side-by-side.','Used with filters for campaign/store-specific cuts.','Supports downstream drill to orders.','Acts as quick channel health snapshot.'],debug:[['One platform missing','Verify canonical platform mapping and selected filters'],['Rates too high/low','Check denominator in backend aggregation (distinct order_id)']],queries:[['GET /api/overview (platform share)',`SELECT fo.canonical_platform AS platform, COUNT(DISTINCT fo.order_id) AS orders,\nSUM(fo.order_value) AS gmv, SUM(fo.net_revenue) AS net_revenue,\nROUND(SUM(fo.is_cancelled)*100.0/NULLIF(COUNT(DISTINCT fo.order_id),0),1) AS cancel_rate\n${'${ordersFrom}'} WHERE ${'${where}'}\nGROUP BY fo.canonical_platform ORDER BY orders DESC`,'Channel-level comparison']]} ,
+  restaurants:{title:'Restaurants Page',purpose:'Ranks restaurant performance and allows branch-level performance audits.',uiApi:[['Restaurant leaderboard','loadRestaurants()','GET /api/restaurants'],['Restaurant AOV deep-dive','restaurant AOV table/chart','GET /api/restaurant_aov']],backend:[['Routes: /api/restaurants, /api/restaurant_aov; helpers: multiIn + group by shop','fact_orders, dim_restaurants','shop_id, restaurant_name, order_value, discount, is_cancelled, order_date','top restaurants + monthly AOV rollups']],flow:['Call /api/restaurants with current filters.','Aggregate GMV/order/cancel metrics per restaurant.','Render ranked list and summary.','Optional AOV route gives monthly trend by shop.','User compares branches under same global context.','Can drill from restaurant rows into order details.'],debug:[['Restaurant names duplicated','Check dim_restaurants mapping and grouping key (shop_id)'],['No rows after filter','Ensure selected shop_id exists in date range']],queries:[['GET /api/restaurants (agg path)',`SELECT a.shop_id, COALESCE(a.restaurant_name, r.restaurant_name, a.shop_id) AS name,\nSUM(a.order_count) AS orders, SUM(a.gmv) AS gmv,\nROUND(SUM(a.cancelled_count)*100.0/NULLIF(SUM(a.order_count),0),1) AS cancel_rate\nFROM agg_restaurant_daily a LEFT JOIN dim_restaurants r ON r.shop_id=a.shop_id\nWHERE ${'${ac.join(\" AND \") }'}\nGROUP BY a.shop_id, a.restaurant_name, r.restaurant_name`,'Restaurant leaderboard'],['GET /api/restaurant_aov',`SELECT COALESCE(r.restaurant_name, fo.restaurant_name, fo.shop_id) AS restaurant_name,\nCOUNT(DISTINCT fo.order_id) AS order_count,\nROUND(AVG(fo.order_value),2) AS aov_gross\nFROM fact_orders fo LEFT JOIN dim_restaurants r ON r.shop_id=fo.shop_id\nWHERE ${'${c.join(\" AND \") }'}\nGROUP BY fo.shop_id, r.restaurant_name, fo.restaurant_name`,'Branch AOV trend']]} ,
+  appfunnel:{title:'App Funnel Page',purpose:'Tracks user progression in app funnel and identifies conversion leak points.',uiApi:[['Stage cards + conversion bars','loadFunnel() + stage render','GET /api/funnel'],['Dropoff users + stage chips','renderAppDropUsers(), setDropStage()','GET /api/funnel_dropoffs'],['Weekly/hourly behavior','renderFunnelHourBars()','GET /api/funnel_weekly']],backend:[['Routes: /api/funnel, /api/funnel_weekly, /api/funnel_dropoffs, /api/funnel_abandoned','fact_funnel, fact_orders','action, action_order, event_date, event_hour, shop_id, customer_contact, order_date','stages, conversion, weekly trend, hourly pattern, dropoff cohorts']],flow:['Load funnel metrics by date/shop filters.','Compute stage counts and conversion percentages.','Generate dropoff cohorts (cart-no-checkout, checkout-no-order).','Render action chips to segment drop users.','Allow CSV export of drop users.','Support drill to order-level data for verification.'],debug:[['Stage counts look inverted','Confirm action_order ordering in fact_funnel'],['Dropoff users unexpectedly empty','Check if order matching window is too narrow']],queries:[['GET /api/funnel (stages)',`SELECT action_order, action AS stage_name, COUNT(*) AS total\nFROM fact_funnel WHERE ${'${fWhere}'}\nGROUP BY action_order, action ORDER BY action_order`,'Funnel stage counts'],['GET /api/funnel (dropoff agg)',`SELECT ff.customer_contact,\nSUM(CASE WHEN ff.action='VIEW_CART' THEN 1 ELSE 0 END) AS view_cart_count,\nSUM(CASE WHEN ff.action='CHECKOUT' THEN 1 ELSE 0 END) AS checkout_count,\nSUM(CASE WHEN ff.action='ORDER' THEN 1 ELSE 0 END) AS order_count\nFROM fact_funnel ff\nWHERE ${'${fWhere}'} AND ff.customer_contact IS NOT NULL\nGROUP BY ff.customer_contact`,'Dropoff cohorts']]} ,
+  wafunnel:{title:'WA Funnel Page',purpose:'Maps WhatsApp journey actions and campaign-driven engagement-to-order behavior.',uiApi:[['WA stage funnel + trend','loadFunnelWA()','GET /api/funnel_wa'],['Top WA restaurants','table render','GET /api/funnel_top_restaurants']],backend:[['Routes: /api/funnel_wa, /api/funnel_top_restaurants','fact_funnel_wa','action, action_order, event_date, event_hour, shop_id, customer_contact, campaign_id','wa stages, weekly/monthly/hourly slices, restaurant ranking']],flow:['Call WA funnel route with active filters.','Aggregate stage progression and dropoffs.','Render top restaurants by WA interactions.','Link campaign context where available.','Enable drill paths to orders/campaign activity.','Use same filter contract as app funnel.'],debug:[['WA actions missing','Validate action names present in fact_funnel_wa'],['Campaign relation unclear','Check campaign_id consistency across tables']],queries:[['GET /api/funnel_wa (stages)',`SELECT action_order, action AS stage_name, COUNT(*) AS total\nFROM fact_funnel_wa WHERE ${'${fWhere}'}\nGROUP BY action_order, action ORDER BY action_order`,'WA stage counts'],['GET /api/funnel_wa (by restaurant)',`SELECT restaurant_name, shop_id,\nSUM(CASE WHEN action='VIEW_CART' THEN 1 ELSE 0 END) AS view_cart,\nSUM(CASE WHEN action='ORDER' THEN 1 ELSE 0 END) AS orders\nFROM fact_funnel_wa WHERE ${'${fWhere}'}\nGROUP BY restaurant_name, shop_id`,'Restaurant performance']]} ,
+  campaigns:{title:'Campaigns Page',purpose:'Explains campaign delivery quality and post-campaign conversion outcomes.',uiApi:[['Campaign summary and recipients','loadCampaigns()','GET /api/campaigns'],['Non-converter list','filter/export controls','GET /api/campaign_nonconv'],['User history + activity','modal/detail views','GET /api/campaign_user_history, /api/campaign_funnel_activity']],backend:[['Routes: /api/campaigns, /api/campaign_nonconv, /api/campaign_user_history, /api/campaign_funnel_activity','fact_campaigns, fact_orders, agg_customer_behavior, fact_funnel_wa/fact_funnel','campaign_name, campaign_id, mobile_number, scheduled_date, delivery_status, is_sent/is_delivered/is_read, order_date, customer_segment','campaign metrics, recipients, non-converters, history/activity views']],flow:['Select campaign and date scope.','Load delivery/read stats and recipient base.','Fetch non-converters and optionally export list.','Inspect user-level order history pre/post campaign.','Compare funnel activity after message delivery.','Derive outreach actions based on cohort.'],debug:[['No non-converters returned','Check campaign_name exact match and date window'],['Delivery rates off','Validate status fields in fact_campaigns']],queries:[['GET /api/campaigns (perf)',`SELECT rb.campaign_name,\nCOUNT(DISTINCT rb.mobile_number) AS total_recipients,\nSUM(rb.is_sent) AS sent_count,\nSUM(rb.is_delivered) AS delivered_count,\nSUM(rb.is_read) AS read_count\nFROM (${ 'recipientBase' }) rb\nGROUP BY rb.campaign_name`,'Campaign delivery funnel'],['GET /api/campaign_nonconv',`SELECT fc.mobile_number, DATE(fc.scheduled_date) AS campaign_date,\nfc.delivery_status, COALESCE(cb.customer_segment,'Unknown') AS segment\nFROM fact_campaigns fc LEFT JOIN agg_customer_behavior cb ON cb.customer_contact = fc.mobile_number\nWHERE fc.campaign_name = ? AND fc.is_delivered = 1\nAND fc.mobile_number NOT IN (\n  SELECT DISTINCT fo2.customer_contact FROM fact_orders fo2\n  WHERE fo2.order_date >= DATE(fc.scheduled_date) AND fo2.customer_contact = fc.mobile_number\n)`,'Non-converters']]} ,
+  customers:{title:'Customers Page',purpose:'Profiles customer quality and loyalty through segment and lifecycle behavior.',uiApi:[['Segment cards + top customers','loadCustomers()','GET /api/customers']],backend:[['Route: /api/customers','agg_customer_behavior, dim_customers','customer_contact, customer_segment, total_orders, total_gmv, cancelled_orders, coupon_usage, customer_name, platform','segment counts, top lists, repeat/coupon metrics']],flow:['Fetch customer aggregate payload.','Render segment distribution and top customer tables.','Analyze repeat behavior and coupon dependence.','Use same global filters for time/platform context.','Support follow-up targeting from identified cohorts.','Cross-link with campaign/product insights.'],debug:[['Segment totals unexpected','Confirm segment definition logic in agg_customer_behavior'],['Customer names missing','Check dim_customers join completeness']],queries:[['GET /api/customers (segments)',`SELECT customer_segment, COUNT(*) AS cnt,\nSUM(total_gmv) AS gmv, ROUND(AVG(total_orders),1) AS avg_orders\nFROM agg_customer_behavior\nGROUP BY customer_segment\nORDER BY FIELD(customer_segment,'VIP','Loyal','Repeat','One-time')`,'Segment summary'],['GET /api/customers (coupon behavior)',`SELECT fo.has_coupon, COUNT(DISTINCT fo.order_id) AS orders,\nROUND(AVG(fo.order_value),2) AS aov,\nCOALESCE(SUM(fo.discount),0) AS total_discount\nFROM fact_orders fo WHERE ${'${where}'} GROUP BY fo.has_coupon`,'Coupon vs non-coupon behavior']]} ,
+  products:{title:'Products Page',purpose:'Shows item-level performance and buyer-level details for merchandising decisions.',uiApi:[['Top products by platform/month','loadProducts()','GET /api/products'],['Item customer drill','showItemCustomers()','GET /api/item_customers'],['Trend items overlay','trend visuals','GET /api/trend_items']],backend:[['Routes: /api/products, /api/item_customers, /api/trend_items','fact_order_items, fact_orders, agg_customer_behavior, dim_restaurants','product_name, order_id, order_date, platform, shop_id, customer_contact, customer_segment','top items, monthly trend, customer lists per item']],flow:['Load product summaries under active filters.','Display month navigation for item trends.','Click item to fetch customer buyers.','Show customer segment and lifetime context.','Identify winning item-restaurant combinations.','Export or cross-check via orders drill.'],debug:[['Items show as null/nan','Check item cleanup filters in SQL'],['Item customers incomplete','Validate order_id join between items and orders']],queries:[['GET /api/products',`SELECT fo.canonical_platform AS platform, i.product_name,\nCOUNT(DISTINCT fo.order_id) AS qty\nFROM fact_order_items i\nJOIN (SELECT fo.*, ${'${itemPlatExpr}'} AS canonical_platform FROM fact_orders fo) fo ON fo.order_id = i.order_id\nWHERE ${'${where}'} AND i.product_name IS NOT NULL\nGROUP BY fo.canonical_platform, i.product_name, fo.shop_id, fo.order_year, fo.order_month`,'Top items by platform/month'],['GET /api/item_customers',`SELECT fo.order_date, fo.order_id, i.product_name,\nfo.customer_contact, COALESCE(dc.customer_name,'—') AS customer_name,\nCOALESCE(cb.customer_segment,'Unknown') AS customer_segment\nFROM fact_order_items i JOIN fact_orders fo ON fo.order_id=i.order_id\nLEFT JOIN dim_customers dc ON dc.customer_contact=fo.customer_contact\nLEFT JOIN agg_customer_behavior cb ON cb.customer_contact=fo.customer_contact\nWHERE ${'${where}'} AND i.product_name = ?`,'Customers for selected item']]} ,
+  geo:{title:'Geo Page',purpose:'Analyzes distance and pincode patterns to optimize delivery and pickup strategy.',uiApi:[['Distance buckets + pickup candidates','loadGeo()','GET /api/geo'],['Geo export','exportGeo()','GET /api/export/csv (geo type)']],backend:[['Route: /api/geo','fact_order_geo, dim_customers','delivery_distance, restaurant_pincode, customer_pincode, order_date, customer_contact, restaurant_name','distance bands, conversion opportunities, geo rows']],flow:['Fetch geo payload with current filters.','Compute bucket summaries and opportunity metrics.','Render pincode/distance insights.','Allow CSV export for field teams.','Use geo findings to propose pickup conversion.','Cross-check with order statuses if needed.'],debug:[['Distance buckets empty','Check delivery_distance null rate'],['Pincode quality issues','Validate extraction in pipeline or source data']],queries:[['GET /api/geo (distance buckets)',`SELECT CASE\n  WHEN g.delivery_distance < 1 THEN '< 1 km'\n  WHEN g.delivery_distance < 2 THEN '1–2 km'\n  WHEN g.delivery_distance < 3 THEN '2–3 km'\n  WHEN g.delivery_distance < 5 THEN '3–5 km'\n  WHEN g.delivery_distance < 10 THEN '5–10 km'\n  ELSE '10+ km' END AS distance_bucket,\nCOUNT(*) AS orders\n${'${geoFrom}'} WHERE ${'${gWhere}'}\nGROUP BY distance_bucket, g.canonical_platform`,'Distance distribution'],['GET /api/geo (pickup candidates)',`SELECT g.customer_contact, g.restaurant_name, g.delivery_distance,\nCOALESCE(dc.customer_name,'—') AS customer_name\n${'${geoFrom}'} LEFT JOIN dim_customers dc ON dc.customer_contact=g.customer_contact\nWHERE ${'${gWhere}'} AND g.delivery_distance <= ?`,'Nearby users for pickup conversion']]} ,
+  pnl:{title:'P&L Page',purpose:'Breaks down commercial performance into revenue and cost components by time/platform.',uiApi:[['Monthly financial table/chart','loadPnl()','GET /api/pnl']],backend:[['Route: /api/pnl; helper: canonicalPlatformExpr','fact_orders','order_value, net_revenue, discount, menu_discount, cart_discount, coupon_value, packing_charge, delivery_charge, convenience_charge, tax, order_date','monthly pnl rows and platform splits']],flow:['Call /api/pnl with active filters.','Aggregate revenue/cost fields monthly.','Render composition for margin reading.','Compare platforms over same period.','Detect discount/coupon pressure.','Use with trends to explain GMV vs net variance.'],debug:[['Discount mismatch','Check COALESCE handling for null discount fields'],['Net revenue anomaly','Verify formula and cancellation inclusion']],queries:[['GET /api/pnl',`SELECT CONCAT(fo.order_year,'-',LPAD(fo.order_month,2,'0')) AS month_key,\nSUM(fo.order_value) AS gmv,\nSUM(fo.net_revenue) AS net_revenue,\nCOALESCE(SUM(fo.discount),0) AS total_discount,\nCOALESCE(SUM(fo.packing_charge),0) AS packing_charge,\nCOALESCE(SUM(fo.tax),0) AS tax\n${'${ordersFrom}'} WHERE ${'${where}'}\nGROUP BY fo.order_year, fo.order_month`,'Monthly P&L']]} ,
+  orders:{title:'Orders Page',purpose:'Provides row-level operational monitoring with pagination and detailed drill support.',uiApi:[['Paginated orders table','loadOrdersTab()','GET /api/orders_list'],['Per-row detail modal','drillRow() -> showDrillOrders()','GET /api/drill'],['Scoped export','exportOrders()','GET /api/export/csv|excel']],backend:[['Routes: /api/orders_list, /api/drill, /api/orders_by_date|month|delivery_type','fact_orders, dim_customers, dim_restaurants, agg_customer_behavior','order_id, order_date, order_status, delivery_type, customer_contact, shop_id, order_value, has_coupon, coupon_value','orders list + detailed drill rows']],flow:['Open Orders tab with current filters.','Fetch paginated rows and render table.','Click row/metric to load drill modal.','Inspect detailed financial and customer fields.','Export scoped order set if required.','Iterate with status/coupon/date filters.'],debug:[['Pagination not moving','Check page/limit query params and frontend state'],['Drill inconsistent with list','Confirm same filters forwarded to /api/drill']],queries:[['GET /api/orders_list',`SELECT DISTINCT fo.order_id, fo.order_date, fo.order_status,\nfo.customer_contact, COALESCE(dc.customer_name,'—') AS customer_name,\nfo.order_value, fo.delivery_type, fo.has_coupon\nFROM fact_orders fo\nLEFT JOIN dim_customers dc ON dc.customer_contact = fo.customer_contact\nWHERE ${'${where}'}\nORDER BY fo.order_date DESC, fo.order_id\nLIMIT ${'${limit}'} OFFSET ${'${offset}'}`,'Paginated order table'],['GET /api/drill',`SELECT DISTINCT fo.order_id, fo.order_date, fo.order_dow, fo.order_hour,\nfo.canonical_platform AS platform,\nCOALESCE(cb.customer_segment,'Unknown') AS customer_segment,\nfo.order_value, fo.net_revenue, COALESCE(fo.discount,0) AS discount\n${'${ordersFrom}'} WHERE ${'${c.join(\" AND \") }'}\nORDER BY fo.order_date DESC`, 'Modal drill rows']]} ,
+  coupons:{title:'Coupons Page',purpose:'Isolates coupon-influenced orders for offer-performance and discount leakage analysis.',uiApi:[['Coupon metrics + list','loadCouponsTab()','GET /api/coupons'],['Coupon export','exportCoupons()','GET /api/export/csv']],backend:[['Route: /api/coupons','fact_orders, dim_customers, dim_restaurants','has_coupon, coupon_value, discount, order_value, order_date, platform, order_status, customer_contact','coupon summary and row dataset']],flow:['Call coupon route under global filters.','Render coupon usage and order rows.','Analyze value vs discount impact.','Export for campaign/finance follow-up.','Compare against P&L and customer behavior.','Drill suspicious cases in Orders tab.'],debug:[['Coupon rows too low','Ensure has_coupon filter isn’t over-constraining'],['Coupon value nulls','Check source completeness in fact_orders']],queries:[['GET /api/coupons (by coupon)',`SELECT COALESCE(fo.coupon_value, fo.discount, 0) AS coupon_value,\nfo.platform, COUNT(DISTINCT fo.order_id) AS times_used,\nSUM(fo.order_value) AS total_gmv\nFROM fact_orders fo\nWHERE ${'${where}'} AND fo.has_coupon = 1\nGROUP BY fo.coupon_value, fo.discount, fo.platform`,'Coupon summary'],['GET /api/coupons (detail)',`SELECT DISTINCT fo.order_id, fo.order_date, fo.platform,\nfo.customer_contact, COALESCE(dc.customer_name,'—') AS customer_name,\nfo.coupon_value, fo.discount, fo.order_value\nFROM fact_orders fo\nLEFT JOIN dim_customers dc ON dc.customer_contact = fo.customer_contact\nWHERE ${'${where}'} AND fo.has_coupon = 1\nORDER BY fo.order_date DESC LIMIT 500`,'Detailed coupon orders']]} ,
+  export:{title:'Export Page (public/export.html)',purpose:'Dedicated extraction workspace with preview-first workflow to reduce wrong downloads.',uiApi:[['Preview rows','runPreview()','POST /api/export/preview'],['Download csv/xls','runExport(format)','GET /api/export/csv, GET /api/export/excel'],['Client enrichments','search/sort/column visibility','local in-browser processing']],backend:[['Core: buildExportQuery() + toCSV()/toExcel()','fact_orders, fact_order_items, fact_order_geo, fact_campaigns, dim_customers, dim_restaurants, agg_customer_behavior','varies by export_type: orders/customers/items/coupons/geo/campaigns/drill','rows + count for preview; file stream for export']],flow:['User selects export_type + filters.','Preview endpoint validates query and returns first 200 rows.','User applies search/sort/column preferences.','Final CSV/XLS endpoint runs same query shape with full limit.','File downloaded with headers and filename.','Errors surfaced clearly in UI status area.'],debug:[['Preview works but download fails','Check GET export endpoint response headers/status'],['Wrong export type data','Verify export_type value in query string']],queries:[['buildExportQuery(type=orders)',`SELECT DISTINCT fo.order_id, fo.order_date,\n${'${platExpr}'} AS platform,\nCOALESCE(r.restaurant_name, fo.restaurant_name, fo.shop_id) AS restaurant_name,\nfo.order_status, dc.customer_name, fo.customer_contact,\nCOALESCE(cb.customer_segment,'Unknown') AS customer_segment,\nfo.order_value, fo.net_revenue, COALESCE(fo.discount,0) AS discount\nFROM fact_orders fo\nLEFT JOIN dim_restaurants r ON r.shop_id = fo.shop_id\nLEFT JOIN dim_customers dc ON dc.customer_contact = fo.customer_contact\nLEFT JOIN agg_customer_behavior cb ON cb.customer_contact = fo.customer_contact\nWHERE ${'${w.join(\" AND \") }'} ORDER BY fo.order_date DESC LIMIT ${'${limit}'}`,'Orders export SQL'],['POST /api/export/preview',`const { sql, params } = buildExportQuery({ ...req.query, ...req.body, limit: \"200\" });\nconst rows = await q(sql, params);\nres.json({ rows, count: rows.length });`,'Preview API execution path'],['GET /api/export/csv',`const { sql, params } = buildExportQuery(req.query);\nconst rows = await q(sql, params);\nres.send(\"\\uFEFF\" + toCSV(rows));`,'CSV stream response']]} 
+};
+
+const pageOrder = ['overview','trends','platform','restaurants','appfunnel','wafunnel','campaigns','customers','products','geo','pnl','orders','coupons','export'];
+
+function renderPageButtons(){
+  const holder = document.getElementById('page-tab-buttons');
+  holder.innerHTML = pageOrder.map((k,i)=>`<button class="btn ${i===0?'active':''}" onclick="switchPage('${k}',this)">${PAGE_DATA[k].title.replace(' (Deep Technical Detail)','')}</button>`).join('');
+}
+
+function switchPage(key, btn){
+  document.querySelectorAll('#page-tab-buttons .btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const p = PAGE_DATA[key];
+  document.getElementById('page-title').textContent = p.title;
+  document.getElementById('page-purpose').textContent = p.purpose;
+
+  document.getElementById('ui-api-body').innerHTML = p.uiApi.map(r=>`<tr><td>${r[0]}</td><td class="code">${r[1]}</td><td><span class="pill api">API</span> <span class="code">${r[2]}</span></td></tr>`).join('');
+
+  document.getElementById('backend-db-body').innerHTML = p.backend.map(r=>`<tr><td class="code">${r[0]}</td><td class="code">${r[1]}</td><td class="code">${r[2]}</td><td class="code">${r[3]}</td></tr>`).join('');
+
+  document.getElementById('flow-box').innerHTML = p.flow.map((s,i)=>`<div class="step"><b>Step ${i+1}</b><br/>${s}</div>`).join('');
+
+  document.getElementById('debug-body').innerHTML = p.debug.map(r=>`<tr><td class="warn">${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+  document.getElementById('query-body').innerHTML = (p.queries||[]).map(q=>`<tr><td class="code">${q[0]}</td><td class="sql">${q[1]}</td><td>${q[2]}</td></tr>`).join('');
+}
+
+function mainTab(name, btn){
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tabs .btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('main-'+name).classList.add('active');
+  btn.classList.add('active');
+}
+
+renderPageButtons();
+switchPage('overview', document.querySelector('#page-tab-buttons .btn'));
+</script>
+</body>
+</html>

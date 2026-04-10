@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Workflow Worksheet — Project Control Center</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f3ee;--card:#fffdf8;--ink:#0a0c10;--line:#d8d2c7;
+  --ok:#166534;--todo:#1d4ed8;--bug:#b91c1c;--upd:#9333ea;--muted:#6b7280;
+}
+body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh}
+.top{
+  display:flex;justify-content:space-between;align-items:flex-end;gap:10px;
+  background:#0f172a;color:#f8fafc;padding:24px 28px;border-bottom:2px solid #1e293b;
+}
+.title{font-size:29px;font-weight:800;letter-spacing:-.7px}
+.title span{color:#86efac}
+.sub{font:500 11px/1.4 'JetBrains Mono',monospace;color:#9ca3af;margin-top:4px}
+.top a{
+  text-decoration:none;background:#1f2937;color:#f8fafc;border:1px solid #334155;
+  border-radius:8px;padding:8px 11px;font:700 10px/1 'JetBrains Mono',monospace
+}
+.top a:hover{background:#334155}
+.wrap{padding:22px;display:grid;grid-template-columns:1.4fr 1fr;gap:16px}
+.card{
+  background:var(--card);border:1px solid var(--line);border-radius:12px;
+  box-shadow:0 6px 18px rgba(0,0,0,.06);
+}
+.card h2{padding:14px 14px 10px;border-bottom:1px solid var(--line);font-size:15px}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.kpi{padding:14px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.kpi .n{font:800 28px/1 'Syne',sans-serif}
+.kpi .l{font:700 10px/1 'JetBrains Mono',monospace;color:var(--muted);margin-top:5px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.toolbar input,.toolbar select,.toolbar textarea{
+  border:1px solid #c8c1b3;border-radius:7px;padding:8px 9px;background:#fff;
+  font:500 11px/1.2 'JetBrains Mono',monospace;
+}
+.toolbar textarea{resize:vertical;min-height:68px;width:100%}
+.btn{
+  border:1px solid #1f2937;background:#111827;color:#f8fafc;border-radius:7px;
+  padding:8px 10px;cursor:pointer;font:700 10px/1 'JetBrains Mono',monospace
+}
+.btn:hover{background:#1f2937}
+.list{padding:10px 14px 14px;display:flex;flex-direction:column;gap:8px;max-height:460px;overflow:auto}
+.item{
+  border:1px solid var(--line);background:#fff;border-left:5px solid #64748b;
+  border-radius:8px;padding:10px 10px 9px;
+}
+.item.done{border-left-color:var(--ok)}
+.item.todo{border-left-color:var(--todo)}
+.item.bug{border-left-color:var(--bug)}
+.item.update{border-left-color:var(--upd)}
+.row{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.tag{font:700 9px/1 'JetBrains Mono',monospace;padding:3px 6px;border-radius:99px;border:1px solid #d1d5db}
+.meta{font:500 9px/1.2 'JetBrains Mono',monospace;color:var(--muted);margin-top:7px}
+.desc{margin-top:6px;font:500 11px/1.4 'JetBrains Mono',monospace;color:#1f2937}
+.act{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.mini{border:1px solid #d1d5db;background:#f8fafc;border-radius:6px;padding:6px 7px;cursor:pointer;font:700 9px/1 'JetBrains Mono',monospace}
+.tree{padding:12px 14px 14px}
+.tree textarea{width:100%;min-height:230px}
+.logs{padding:12px 14px 14px;display:flex;flex-direction:column;gap:8px;max-height:240px;overflow:auto}
+.log{font:500 10px/1.35 'JetBrains Mono',monospace;background:#fff;border:1px dashed #d1d5db;border-radius:6px;padding:7px}
+@media (max-width:1080px){.wrap{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <div class="title">Project <span>Workflow Worksheet</span></div>
+    <div class="sub">Track done work, pending tasks, bugs, updates, and your project tree in one place.</div>
+  </div>
+  <a href="Table_architech.html">← Back to Schema Screen</a>
+</header>
+
+<main class="wrap">
+  <section class="card" style="padding:14px">
+    <div class="metrics">
+      <div class="kpi"><div class="n" id="kDone">0</div><div class="l">DONE</div></div>
+      <div class="kpi"><div class="n" id="kTodo">0</div><div class="l">TO DO</div></div>
+      <div class="kpi"><div class="n" id="kBug">0</div><div class="l">BUGS</div></div>
+      <div class="kpi"><div class="n" id="kUpdate">0</div><div class="l">UPDATES</div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Project Tree / Notes</h2>
+    <div class="tree">
+      <textarea id="projectTree" placeholder="Write your project structure, module ownership, flow notes, and references..."></textarea>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" id="saveTree">Save Tree Notes</button>
+        <button class="btn" id="clearTree">Clear</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Work Item Manager</h2>
+    <div class="toolbar">
+      <input id="title" placeholder="Title (e.g., Fix checkout bug)"/>
+      <select id="type">
+        <option value="todo">TO DO</option>
+        <option value="done">DONE</option>
+        <option value="bug">BUG</option>
+        <option value="update">UPDATE</option>
+      </select>
+      <input id="owner" placeholder="Owner"/>
+      <input id="module" placeholder="Module/Screen"/>
+      <textarea id="desc" placeholder="Describe work, blocker, or update..."></textarea>
+      <button class="btn" id="addItem">Add Item</button>
+      <input id="search" placeholder="Search title/description/module"/>
+      <select id="filter">
+        <option value="all">All Types</option>
+        <option value="done">Done</option>
+        <option value="todo">To Do</option>
+        <option value="bug">Bug</option>
+        <option value="update">Update</option>
+      </select>
+      <button class="btn" id="exportJson">Export JSON</button>
+      <button class="btn" id="importJson">Import JSON</button>
+      <button class="btn" id="clearAll">Clear All Items</button>
+    </div>
+    <div class="list" id="itemList"></div>
+  </section>
+
+  <section class="card">
+    <h2>Activity Log</h2>
+    <div class="logs" id="logList"></div>
+  </section>
+</main>
+
+<script>
+const itemKey='workflow-items-v1', logKey='workflow-logs-v1', treeKey='workflow-tree-v1';
+const $=id=>document.getElementById(id);
+let items=JSON.parse(localStorage.getItem(itemKey)||'[]');
+let logs=JSON.parse(localStorage.getItem(logKey)||'[]');
+
+function stamp(){return new Date().toLocaleString();}
+function save(){localStorage.setItem(itemKey,JSON.stringify(items));localStorage.setItem(logKey,JSON.stringify(logs));}
+function log(msg){logs.unshift(`[${stamp()}] ${msg}`);logs=logs.slice(0,200);save();renderLogs();}
+
+function counts(){
+  const by=t=>items.filter(i=>i.type===t).length;
+  $('kDone').textContent=by('done');$('kTodo').textContent=by('todo');
+  $('kBug').textContent=by('bug');$('kUpdate').textContent=by('update');
+}
+
+function escapeHtml(s=''){return s.replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));}
+function renderLogs(){ $('logList').innerHTML=logs.map(l=>`<div class="log">${escapeHtml(l)}</div>`).join('')||'<div class="log">No activity yet.</div>'; }
+
+function renderItems(){
+  const q=$('search').value.trim().toLowerCase(); const f=$('filter').value;
+  const rows=items.filter(i=>{
+    const hit=`${i.title} ${i.desc} ${i.module}`.toLowerCase().includes(q);
+    const ok=f==='all'||i.type===f; return hit&&ok;
+  });
+  $('itemList').innerHTML=rows.map(i=>`
+    <article class="item ${i.type}">
+      <div class="row"><strong>${escapeHtml(i.title)}</strong><span class="tag">${i.type.toUpperCase()}</span></div>
+      <div class="desc">${escapeHtml(i.desc)}</div>
+      <div class="meta">Owner: ${escapeHtml(i.owner||'—')} · Module: ${escapeHtml(i.module||'—')} · Created: ${escapeHtml(i.createdAt)}</div>
+      <div class="act">
+        <button class="mini" data-act="cycle" data-id="${i.id}">Change Status</button>
+        <button class="mini" data-act="dup" data-id="${i.id}">Duplicate</button>
+        <button class="mini" data-act="del" data-id="${i.id}">Delete</button>
+      </div>
+    </article>
+  `).join('')||'<div class="log">No matching items.</div>';
+  counts();
+}
+
+function addItem(){
+  const title=$('title').value.trim(), type=$('type').value, owner=$('owner').value.trim();
+  const module=$('module').value.trim(), desc=$('desc').value.trim();
+  if(!title||!desc){alert('Please add both title and description.');return;}
+  items.unshift({id:`w_${Date.now()}_${Math.random().toString(16).slice(2,8)}`,title,type,owner,module,desc,createdAt:stamp()});
+  ['title','owner','module','desc'].forEach(id=>$(`${id}`).value='');
+  save(); renderItems(); log(`Added ${type.toUpperCase()} item: ${title}`);
+}
+
+function cycleStatus(id){
+  const order=['todo','done','bug','update'];
+  const row=items.find(i=>i.id===id); if(!row) return;
+  row.type=order[(order.indexOf(row.type)+1)%order.length];
+  save(); renderItems(); log(`Status changed: ${row.title} -> ${row.type.toUpperCase()}`);
+}
+function deleteItem(id){const row=items.find(i=>i.id===id); items=items.filter(i=>i.id!==id); save(); renderItems(); if(row)log(`Deleted item: ${row.title}`);}
+function duplicateItem(id){
+  const row=items.find(i=>i.id===id); if(!row) return;
+  items.unshift({...row,id:`w_${Date.now()}_${Math.random().toString(16).slice(2,8)}`,title:`${row.title} (copy)`,createdAt:stamp()});
+  save(); renderItems(); log(`Duplicated item: ${row.title}`);
+}
+
+$('addItem').addEventListener('click',addItem);
+$('search').addEventListener('input',renderItems);
+$('filter').addEventListener('change',renderItems);
+$('itemList').addEventListener('click',e=>{
+  const btn=e.target.closest('button[data-id]'); if(!btn) return;
+  const {id,act}=btn.dataset;
+  if(act==='cycle') cycleStatus(id);
+  if(act==='dup') duplicateItem(id);
+  if(act==='del') deleteItem(id);
+});
+
+$('clearAll').addEventListener('click',()=>{
+  if(!confirm('Clear all worksheet items?')) return;
+  items=[]; save(); renderItems(); log('Cleared all worksheet items');
+});
+
+$('exportJson').addEventListener('click',()=>{
+  const payload={items,logs,tree:$('projectTree').value,exportedAt:stamp()};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='workflow_worksheet_export.json'; a.click();
+  URL.revokeObjectURL(a.href); log('Exported worksheet JSON');
+});
+
+$('importJson').addEventListener('click',()=>{
+  const input=document.createElement('input'); input.type='file'; input.accept='application/json';
+  input.onchange=()=>{
+    const file=input.files?.[0]; if(!file) return;
+    const fr=new FileReader();
+    fr.onload=()=>{
+      try{
+        const data=JSON.parse(String(fr.result||'{}'));
+        if(Array.isArray(data.items)) items=data.items;
+        if(Array.isArray(data.logs)) logs=data.logs;
+        if(typeof data.tree==='string') $('projectTree').value=data.tree;
+        save(); localStorage.setItem(treeKey,$('projectTree').value); renderItems(); renderLogs(); log('Imported worksheet JSON');
+      }catch{alert('Invalid JSON file.');}
+    };
+    fr.readAsText(file);
+  };
+  input.click();
+});
+
+$('saveTree').addEventListener('click',()=>{localStorage.setItem(treeKey,$('projectTree').value);log('Saved project tree notes');});
+$('clearTree').addEventListener('click',()=>{$('projectTree').value='';localStorage.removeItem(treeKey);log('Cleared project tree notes');});
+
+window.addEventListener('load',()=>{
+  $('projectTree').value=localStorage.getItem(treeKey)||'';
+  renderItems(); renderLogs();
+});
+</script>
+</body>
+</html>

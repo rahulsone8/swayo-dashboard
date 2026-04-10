@@ -1684,6 +1684,69 @@ async function loadCustomers() {
           <td>${c.last_order_date||'—'}</td></tr>`).join('');
     html('top-cust',`<table><thead><tr><th>Name</th><th>Contact</th><th>Total Orders</th><th>Segment</th><th>GMV</th><th>First Order</th><th>Last Order</th></tr></thead>
       <tbody>${trows||'<tr><td colspan="7" class="loading">No data</td></tr>'}</tbody></table>`);
+
+    // ── USER MOVEMENT TRACKING ──────────────────────────────────────────────────
+    const movement=await api('user_movement?'+fp());
+    
+    // Summary by user type
+    const sumRows=(movement.summary||[]).map(s=>{
+      const pct2=(s.user_count/(movement.summary.reduce((a,x)=>a+Number(x.user_count),0)||1)*100).toFixed(1);
+      const color=s.user_type==='Cross-Platform'?'var(--green)':s.user_type==='App Only'?'var(--blue)':'var(--purple)';
+      return `<div style="background:var(--bg1);border-radius:8px;padding:15px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:12px;color:var(--t2);font-weight:600">${s.user_type}</div>
+          <div style="font-size:24px;font-weight:800;color:${color}">${fmt(s.user_count)}</div>
+        </div>
+        <div style="margin-top:8px;height:8px;background:var(--bg2);border-radius:4px;overflow:hidden">
+          <div style="height:100%;background:${color};width:${pct2}%"></div>
+        </div>
+        <div style="margin-top:5px;font-size:10px;color:var(--t3)">${pct2}% of users</div>
+      </div>`;
+    }).join('');
+    html('movement-summary',sumRows||'<div class="loading">No data</div>');
+
+    // Platform transitions
+    const transRows=(movement.transitions||[]).slice(0,10).map(t=>`
+      <tr>
+        <td><span class="pill ${t.from_platform.includes('app')?'pb':'pp'}">${t.from_platform.replace('_',' ')}</span></td>
+        <td style="text-align:center;color:var(--t3)">→</td>
+        <td><span class="pill ${t.to_platform.includes('app')?'pb':'pp'}">${t.to_platform.replace('_',' ')}</span></td>
+        <td class="num hi">${fmt(t.user_count)}</td>
+      </tr>`).join('');
+    html('transitions-table',`<table><thead><tr><th>From</th><th></th><th>To</th><th>Users</th></tr></thead>
+      <tbody>${transRows||'<tr><td colspan="4" class="loading">No transitions found</td></tr>'}</tbody></table>`);
+
+    // Cross-platform users (movements)
+    const movRows=(movement.movements||[]).slice(0,50).map(m=>`
+      <tr>
+        <td>${m.customer_name!=='—'?m.customer_name:'—'}</td>
+        <td class="mono">${m.customer_contact}</td>
+        <td><span class="pill ${m.customer_segment==='VIP'?'pg':m.customer_segment==='Loyal'?'po':m.customer_segment==='Repeat'?'pb':'pp'}">${m.customer_segment||'—'}</span></td>
+        <td class="num">${m.platform_count}</td>
+        <td style="font-size:10px">${(m.platforms_used||'').split(',').map(p=>`<span class="pill ${p.includes('app')?'pb':'pp'}" style="margin:2px">${p.replace('_',' ')}</span>`).join('')}</td>
+        <td class="num hi">${fmt(m.total_orders)}</td>
+        <td class="num">${fmtK(m.total_value)}</td>
+        <td style="font-size:9px;color:var(--t3)">${m.first_order_overall?m.first_order_overall.split('T')[0]:'—'}</td>
+        <td style="font-size:9px;color:var(--t3)">${m.last_order_overall?m.last_order_overall.split('T')[0]:'—'}</td>
+      </tr>`).join('');
+    html('cross-platform-users',`<table><thead><tr><th>Name</th><th>Contact</th><th>Segment</th><th># Platforms</th><th>Platforms</th><th>Orders</th><th>GMV</th><th>First Order</th><th>Last Order</th></tr></thead>
+      <tbody>${movRows||'<tr><td colspan="9" class="loading">No cross-platform users</td></tr>'}</tbody></table>`);
+
+    // Campaign-driven movements
+    const campRows=(movement.campaignMovements||[]).slice(0,30).map(cm=>`
+      <tr>
+        <td class="mono">${cm.customer_contact}</td>
+        <td style="font-size:10px;color:var(--t2)">${cm.campaign_name}</td>
+        <td style="font-size:10px">${(cm.platforms_before||'').split(',').map(p=>`<span class="pill pp" style="margin:2px">${p.replace('_',' ')}</span>`).join('')}</td>
+        <td style="text-align:center;font-size:16px;color:var(--green)">→</td>
+        <td style="font-size:10px">${(cm.platforms_after||'').split(',').map(p=>`<span class="pill pb" style="margin:2px">${p.replace('_',' ')}</span>`).join('')}</td>
+        <td class="num">${fmt(cm.orders_before||0)}</td>
+        <td class="num hi">${fmt(cm.orders_after||0)}</td>
+        <td style="font-size:9px;color:var(--t3)">${cm.first_order_before?cm.first_order_before.split('T')[0]:'—'}</td>
+        <td style="font-size:9px;color:var(--t3)">${cm.last_order_after?cm.last_order_after.split('T')[0]:'—'}</td>
+      </tr>`).join('');
+    html('campaign-movements',`<table><thead><tr><th>Contact</th><th>Campaign</th><th>Before</th><th></th><th>After</th><th>Orders Before</th><th>Orders After</th><th>First Before</th><th>Last After</th></tr></thead>
+      <tbody>${campRows||'<tr><td colspan="9" class="loading">No campaign-driven movements yet</td></tr>'}</tbody></table>`);
   } catch(e){ console.error(e); } finally { endLoad(); }
 }
 

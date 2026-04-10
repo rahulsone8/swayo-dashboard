@@ -1243,6 +1243,214 @@ app.get("/api/customers", async (req, res) => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+//  USER MOVEMENT TRACKING — Movement between WhatsApp and Swayo App
+//  Baselined with Campaign sent
+// ════════════════════════════════════════════════════════════════════════════
+app.get("/api/user_movement", async (req, res) => {
+  try {
+    const orderTsExpr = "COALESCE(fo.created_at, CAST(CONCAT(fo.order_date, ' 00:00:00') AS DATETIME))";
+    const platformExpr = canonicalPlatformExpr("fo");
+    
+    // Get date filters if provided
+    const { where: ordersWhereSql, vals: ordersWhereVals } = ordersWhere(req.query);
+    
+    // Movement tracking: Users who switched between platforms
+    // Track: WhatsApp (gf_whatsapp + swayo_whatsapp) ↔ Swayo App
+    const movementQuery = `
+      WITH user_platforms AS (
+        SELECT 
+          fo.customer_contact,
+          ${platformExpr} AS platform,
+          MIN(fo.order_date) AS first_order_date,
+          MAX(fo.order_date) AS last_order_date,
+          COUNT(DISTINCT fo.order_id) AS order_count,
+          SUM(fo.order_value) AS total_gmv
+        FROM fact_orders fo
+        WHERE ${ordersWhereSql}
+          AND fo.customer_contact IS NOT NULL
+          AND ${platformExpr} IN ('gf_whatsapp', 'swayo_whatsapp', 'swayo_app')
+        GROUP BY fo.customer_contact, ${platformExpr}
+      ),
+      user_platform_summary AS (
+        SELECT 
+          customer_contact,
+          GROUP_CONCAT(DISTINCT platform ORDER BY platform) AS platforms_used,
+          COUNT(DISTINCT platform) AS platform_count,
+          SUM(order_count) AS total_orders,
+          SUM(total_gmv) AS total_value,
+          MIN(first_order_date) AS first_order_overall,
+          MAX(last_order_date) AS last_order_overall
+        FROM user_platforms
+        GROUP BY customer_contact
+      )
+      SELECT 
+        ups.customer_contact,
+        COALESCE(dc.customer_name, '—') AS customer_name,
+        ups.platforms_used,
+        ups.platform_count,
+        ups.total_orders,
+        ROUND(ups.total_value, 2) AS total_value,
+        ups.first_order_overall,
+        ups.last_order_overall,
+        CASE 
+          WHEN ups.platforms_used LIKE '%swayo_app%' AND 
+               (ups.platforms_used LIKE '%gf_whatsapp%' OR ups.platforms_used LIKE '%swayo_whatsapp%') 
+          THEN 'Cross-Platform'
+          WHEN ups.platforms_used = 'swayo_app' THEN 'App Only'
+          WHEN ups.platforms_used LIKE '%whatsapp%' THEN 'WhatsApp Only'
+          ELSE 'Other'
+        END AS user_type,
+        acb.customer_segment
+      FROM user_platform_summary ups
+      LEFT JOIN dim_customers dc ON dc.customer_contact = ups.customer_contact
+      LEFT JOIN agg_customer_behavior acb ON acb.customer_contact = ups.customer_contact
+      WHERE ups.platform_count > 1
+      ORDER BY ups.total_value DESC
+    `;
+    
+    const movements = await q(movementQuery, ordersWhereVals);
+    
+    // Movement summary statistics
+    const summaryQuery = `
+      WITH user_platforms AS (
+        SELECT 
+          fo.customer_contact,
+          ${platformExpr} AS platform,
+          MIN(fo.order_date) AS first_order_date,
+          COUNT(DISTINCT fo.order_id) AS order_count
+        FROM fact_orders fo
+        WHERE ${ordersWhereSql}
+          AND fo.customer_contact IS NOT NULL
+          AND ${platformExpr} IN ('gf_whatsapp', 'swayo_whatsapp', 'swayo_app')
+        GROUP BY fo.customer_contact, ${platformExpr}
+      ),
+      user_summary AS (
+        SELECT 
+          customer_contact,
+          GROUP_CONCAT(DISTINCT platform ORDER BY platform) AS platforms_used,
+          COUNT(DISTINCT platform) AS platform_count
+        FROM user_platforms
+        GROUP BY customer_contact
+      )
+      SELECT 
+        CASE 
+          WHEN platforms_used LIKE '%swayo_app%' AND 
+               (platforms_used LIKE '%gf_whatsapp%' OR platforms_used LIKE '%swayo_whatsapp%') 
+          THEN 'Cross-Platform'
+          WHEN platforms_used = 'swayo_app' THEN 'App Only'
+          WHEN platforms_used LIKE '%whatsapp%' THEN 'WhatsApp Only'
+          ELSE 'Other'
+        END AS user_type,
+        COUNT(*) AS user_count
+      FROM user_summary
+      GROUP BY user_type
+    `;
+    
+    const summary = await q(summaryQuery, ordersWhereVals);
+    
+    // Campaign-driven movement: Users who moved to app after campaign
+    const campRunExpr = "COALESCE(fc.scheduled_at, fc.delivered_at, fc.read_at, fc.sent_at, DATE_ADD(fc.scheduled_date, INTERVAL 330 MINUTE))";
+    const campaignMovementQuery = `
+      WITH campaign_users AS (
+        SELECT 
+          fc.mobile_number AS customer_contact,
+          fc.campaign_name,
+          MIN(${campRunExpr}) AS first_campaign_date
+        FROM fact_campaigns fc
+        WHERE fc.is_sent = 1
+        GROUP BY fc.mobile_number, fc.campaign_name
+      ),
+      user_platform_before AS (
+        SELECT 
+          cu.customer_contact,
+          cu.campaign_name,
+          ${platformExpr} AS platform,
+          COUNT(DISTINCT fo.order_id) AS orders,
+          MIN(fo.order_date) AS first_date
+        FROM campaign_users cu
+        JOIN fact_orders fo ON fo.customer_contact = cu.customer_contact
+        WHERE ${orderTsExpr} < cu.first_campaign_date
+          AND ${ordersWhereSql}
+          AND ${platformExpr} IN ('gf_whatsapp', 'swayo_whatsapp', 'swayo_app')
+        GROUP BY cu.customer_contact, cu.campaign_name, ${platformExpr}
+      ),
+      user_platform_after AS (
+        SELECT 
+          cu.customer_contact,
+          cu.campaign_name,
+          ${platformExpr} AS platform,
+          COUNT(DISTINCT fo.order_id) AS orders,
+          MAX(fo.order_date) AS last_date
+        FROM campaign_users cu
+        JOIN fact_orders fo ON fo.customer_contact = cu.customer_contact
+        WHERE ${orderTsExpr} >= cu.first_campaign_date
+          AND ${ordersWhereSql}
+          AND ${platformExpr} IN ('gf_whatsapp', 'swayo_whatsapp', 'swayo_app')
+        GROUP BY cu.customer_contact, cu.campaign_name, ${platformExpr}
+      )
+      SELECT 
+        cu.customer_contact,
+        cu.campaign_name,
+        GROUP_CONCAT(DISTINCT upb.platform ORDER BY upb.platform) AS platforms_before,
+        GROUP_CONCAT(DISTINCT upa.platform ORDER BY upa.platform) AS platforms_after,
+        COALESCE(SUM(upb.orders), 0) AS orders_before,
+        COALESCE(SUM(upa.orders), 0) AS orders_after,
+        MIN(upb.first_date) AS first_order_before,
+        MAX(upa.last_date) AS last_order_after
+      FROM campaign_users cu
+      LEFT JOIN user_platform_before upb ON upb.customer_contact = cu.customer_contact AND upb.campaign_name = cu.campaign_name
+      LEFT JOIN user_platform_after upa ON upa.customer_contact = cu.customer_contact AND upa.campaign_name = cu.campaign_name
+      GROUP BY cu.customer_contact, cu.campaign_name
+      HAVING platforms_before IS NOT NULL AND platforms_after IS NOT NULL
+        AND platforms_before != platforms_after
+      ORDER BY orders_after DESC
+      LIMIT 100
+    `;
+    
+    const campaignMovements = await q(campaignMovementQuery, ordersWhereVals);
+    
+    // Platform transition flow (Sankey diagram data)
+    const transitionQuery = `
+      WITH user_first_last_platform AS (
+        SELECT 
+          fo.customer_contact,
+          ${platformExpr} AS platform,
+          fo.order_date,
+          ROW_NUMBER() OVER (PARTITION BY fo.customer_contact ORDER BY fo.order_date ASC) AS order_rank_asc,
+          ROW_NUMBER() OVER (PARTITION BY fo.customer_contact ORDER BY fo.order_date DESC) AS order_rank_desc
+        FROM fact_orders fo
+        WHERE ${ordersWhereSql}
+          AND fo.customer_contact IS NOT NULL
+          AND ${platformExpr} IN ('gf_whatsapp', 'swayo_whatsapp', 'swayo_app')
+      )
+      SELECT 
+        first_p.platform AS from_platform,
+        last_p.platform AS to_platform,
+        COUNT(DISTINCT first_p.customer_contact) AS user_count
+      FROM user_first_last_platform first_p
+      JOIN user_first_last_platform last_p 
+        ON first_p.customer_contact = last_p.customer_contact
+      WHERE first_p.order_rank_asc = 1
+        AND last_p.order_rank_desc = 1
+        AND first_p.platform != last_p.platform
+      GROUP BY from_platform, to_platform
+      ORDER BY user_count DESC
+    `;
+    
+    const transitions = await q(transitionQuery, ordersWhereVals);
+    
+    res.json({ 
+      movements,           // Detailed user movement data
+      summary,             // Summary statistics by user type
+      campaignMovements,   // Campaign-driven platform switches
+      transitions          // Platform transition flow
+    });
+  } catch (e) { 
+    res.status(500).json({ error: e.message }); 
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 //  PRODUCTS
 // ════════════════════════════════════════════════════════════════════════════
 app.get("/api/products", async (req, res) => {

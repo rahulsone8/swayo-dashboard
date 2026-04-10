@@ -184,6 +184,44 @@ body{padding:0}
   z-index:5;
   letter-spacing:.3px;
 }
+
+/* ── NEW UX LAYER ── */
+.action-dock{
+  position:fixed;top:118px;right:24px;z-index:120;
+  display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;
+  max-width:460px;
+}
+.dock-btn,.dock-link{
+  border:1px solid #28303b;background:#101521;color:#f5f3ee;
+  border-radius:8px;padding:8px 10px;
+  font:700 10px/1 'JetBrains Mono',monospace;letter-spacing:.35px;
+  cursor:pointer;text-decoration:none;
+}
+.dock-btn:hover,.dock-link:hover{background:#1f2937}
+.dock-btn.is-active{background:#166534;border-color:#16a34a}
+.tree-panel{
+  position:fixed;left:18px;top:120px;bottom:20px;z-index:90;
+  width:270px;background:rgba(255,253,248,.97);border:1px solid var(--stroke);
+  border-radius:12px;box-shadow:0 10px 30px rgba(10,12,16,.12);
+  display:flex;flex-direction:column;overflow:hidden;backdrop-filter:blur(4px);
+}
+.tree-head{
+  background:#101521;color:#f5f3ee;padding:12px 14px;border-bottom:1px solid #263044;
+}
+.tree-title{font:700 11px/1 'JetBrains Mono',monospace;letter-spacing:.5px}
+.tree-sub{margin-top:5px;font:500 9px/1.3 'JetBrains Mono',monospace;color:#9ca3af}
+.tree-scroll{padding:9px 10px 13px;overflow:auto;flex:1}
+.tree-list{list-style:none}
+.tree-list details{border-bottom:1px dashed #ddd5c8;padding:4px 0}
+.tree-list summary{cursor:pointer;color:#1f2937;font:700 10px/1.4 'JetBrains Mono',monospace}
+.tree-col{font:500 9px/1.35 'JetBrains Mono',monospace;color:#4b5563;padding:2px 0 2px 10px;display:flex;gap:6px}
+.tree-col .k{color:#9ca3af;min-width:18px}
+.tcard.selected{outline:2px solid #16a34a;outline-offset:2px}
+.tcol[contenteditable="true"],.thead-name[contenteditable="true"],.thead-type[contenteditable="true"]{
+  background:#fffbe6;border-radius:3px;padding:0 2px;
+}
+body.edit-mode .thead{box-shadow:inset 0 0 0 1px rgba(22,163,74,.45)}
+body.edit-mode .tcol{cursor:text}
 </style>
 </head>
 <body>
@@ -195,9 +233,9 @@ body{padding:0}
   <div class="hero-sub">Designed by ~ Rahul ·To understand the structure · funnel_pipeline DB</div>
   </div>
   <div class="hero-stats">
-    <div class="stat"><div class="stat-n">13</div><div class="stat-l">Tables</div></div>
-    <div class="stat"><div class="stat-n">12</div><div class="stat-l">Relationships</div></div>
-    <div class="stat"><div class="stat-n">121</div><div class="stat-l">Columns</div></div>
+    <div class="stat"><div class="stat-n" id="stat-tables">13</div><div class="stat-l">Tables</div></div>
+    <div class="stat"><div class="stat-n" id="stat-relationships">12</div><div class="stat-l">Relationships</div></div>
+    <div class="stat"><div class="stat-n" id="stat-columns">121</div><div class="stat-l">Columns</div></div>
   </div>
 </div>
 
@@ -214,6 +252,23 @@ body{padding:0}
   <div class="leg-sep"></div>
   <div class="leg-item" style="color:#888;font-family:'JetBrains Mono',monospace;font-size:10px">I know it's complex</div>
 </div>
+
+<div class="action-dock">
+  <button class="dock-btn" id="toggle-edit-btn" title="Enable/Disable inline editing">Edit Mode</button>
+  <button class="dock-btn" id="add-column-btn" title="Add column in selected table">+ Column</button>
+  <button class="dock-btn" id="add-table-btn" title="Create a new table card">+ Table</button>
+  <a class="dock-link" href="workflow_worksheet.html" title="Open workflow worksheet">Workflow Screen</a>
+</div>
+
+<aside class="tree-panel">
+  <div class="tree-head">
+    <div class="tree-title">SCHEMA TREE</div>
+    <div class="tree-sub" id="tree-meta">0 tables · 0 columns</div>
+  </div>
+  <div class="tree-scroll">
+    <ul class="tree-list" id="schema-tree"></ul>
+  </div>
+</aside>
 
 <!-- ── CANVAS ─────────────────────────────────────────────── -->
 <div class="canvas-wrap" id="canvas-wrap">
@@ -623,6 +678,254 @@ function zoom(factor) {
 }
 function resetZoom() { scale = 1; canvas.style.transform = 'scale(1)'; }
 
+// ── ADVANCED UI / EDITOR ───────────────────────────────────────────────────────
+const schemaTree = document.getElementById('schema-tree');
+const treeMeta = document.getElementById('tree-meta');
+const toggleEditBtn = document.getElementById('toggle-edit-btn');
+const addColumnBtn = document.getElementById('add-column-btn');
+const addTableBtn = document.getElementById('add-table-btn');
+const customTablesKey = 'schema-custom-tables-v1';
+const schemaEditsKey = 'schema-inline-edits-v1';
+
+let editMode = false;
+let selectedTableId = null;
+
+function slugify(value) {
+  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || `table_${Date.now()}`;
+}
+
+function createColumnRowHTML(col) {
+  return `<div class="tcol${col.key ? ` is-${col.key.toLowerCase()}` : ''}" data-tip="${col.tip || ''}">
+    <span class="col-key">${col.key ? `<span class="${col.key.toLowerCase()}-badge">${col.key}</span>` : ''}</span>
+    <span class="col-name">${col.name}</span>
+    <span class="col-type">${col.type || 'VARCHAR'}</span>
+    ${col.note ? `<span class="col-note">${col.note}</span>` : ''}
+  </div>`;
+}
+
+function createTableCard(cfg) {
+  const card = document.createElement('div');
+  card.className = `tcard ${cfg.kind || 'fact'}`;
+  card.id = cfg.id;
+  card.style.left = cfg.left || '1280px';
+  card.style.top = cfg.top || '120px';
+  card.innerHTML = `
+    <div class="thead">
+      <div class="thead-icon"></div>
+      <div><div class="thead-name">${cfg.name}</div><span class="thead-type">${cfg.type || 'Custom Table'}</span></div>
+    </div>
+    <div class="tcols">${(cfg.columns || []).map(createColumnRowHTML).join('')}</div>
+  `;
+  canvas.appendChild(card);
+  bindCardSelection(card);
+  setupDragging();
+  applyEditModeState(card);
+  return card;
+}
+
+function loadCustomTables() {
+  const payload = JSON.parse(localStorage.getItem(customTablesKey) || '[]');
+  payload.forEach(table => {
+    if (!document.getElementById(table.id)) createTableCard(table);
+  });
+}
+
+function saveCustomTables() {
+  const builtIn = new Set([
+    'dim_restaurants','dim_customers','fact_orders','fact_order_items','fact_order_geo',
+    'fact_funnel','fact_funnel_wa','fact_campaigns','agg_platform_daily','agg_restaurant_daily',
+    'agg_funnel_conversion','agg_customer_behavior','agg_campaign_performance'
+  ]);
+  const customTables = [...document.querySelectorAll('.tcard')]
+    .filter(card => !builtIn.has(card.id))
+    .map(card => ({
+      id: card.id,
+      kind: card.classList.contains('dim') ? 'dim' :
+            card.classList.contains('event') ? 'event' :
+            card.classList.contains('camp') ? 'camp' :
+            card.classList.contains('agg') ? 'agg' : 'fact',
+      name: card.querySelector('.thead-name')?.textContent.trim() || card.id,
+      type: card.querySelector('.thead-type')?.textContent.trim() || 'Custom Table',
+      left: card.style.left,
+      top: card.style.top,
+      columns: [...card.querySelectorAll('.tcol')].map(col => ({
+        key: col.querySelector('.col-key .pk-badge') ? 'PK' : col.querySelector('.col-key .fk-badge') ? 'FK' : '',
+        name: col.querySelector('.col-name')?.textContent.trim() || 'column_name',
+        type: col.querySelector('.col-type')?.textContent.trim() || 'VARCHAR',
+        note: col.querySelector('.col-note')?.textContent.trim() || '',
+        tip: col.dataset.tip || ''
+      }))
+    }));
+  localStorage.setItem(customTablesKey, JSON.stringify(customTables));
+}
+
+function saveSchemaEdits() {
+  const edits = {};
+  document.querySelectorAll('.tcard').forEach(card => {
+    edits[card.id] = {
+      name: card.querySelector('.thead-name')?.textContent.trim() || card.id,
+      type: card.querySelector('.thead-type')?.textContent.trim() || '',
+      columns: [...card.querySelectorAll('.tcol')].map(col => ({
+        className: col.className,
+        keyHTML: col.querySelector('.col-key')?.innerHTML || '',
+        name: col.querySelector('.col-name')?.textContent.trim() || '',
+        type: col.querySelector('.col-type')?.textContent.trim() || '',
+        note: col.querySelector('.col-note')?.textContent.trim() || '',
+        tip: col.dataset.tip || ''
+      }))
+    };
+  });
+  localStorage.setItem(schemaEditsKey, JSON.stringify(edits));
+}
+
+function loadSchemaEdits() {
+  const edits = JSON.parse(localStorage.getItem(schemaEditsKey) || 'null');
+  if (!edits) return;
+  Object.entries(edits).forEach(([id, data]) => {
+    const card = document.getElementById(id);
+    if (!card) return;
+    const name = card.querySelector('.thead-name');
+    const type = card.querySelector('.thead-type');
+    if (name && data.name) name.textContent = data.name;
+    if (type && data.type) type.textContent = data.type;
+    if (Array.isArray(data.columns) && data.columns.length) {
+      const body = card.querySelector('.tcols');
+      if (!body) return;
+      body.innerHTML = data.columns.map(col => `
+        <div class="${col.className || 'tcol'}" data-tip="${col.tip || ''}">
+          <span class="col-key">${col.keyHTML || ''}</span>
+          <span class="col-name">${col.name || ''}</span>
+          <span class="col-type">${col.type || 'VARCHAR'}</span>
+          ${col.note ? `<span class="col-note">${col.note}</span>` : ''}
+        </div>
+      `).join('');
+    }
+  });
+}
+
+function bindCardSelection(card) {
+  if (card.dataset.selectReady === '1') return;
+  card.dataset.selectReady = '1';
+  card.addEventListener('click', e => {
+    if (!card.contains(e.target)) return;
+    selectedTableId = card.id;
+    document.querySelectorAll('.tcard').forEach(c => c.classList.toggle('selected', c.id === selectedTableId));
+  });
+}
+
+function refreshSchemaTree() {
+  const cards = [...document.querySelectorAll('.tcard')];
+  const tableCount = cards.length;
+  const colCount = cards.reduce((acc, c) => acc + c.querySelectorAll('.tcol').length, 0);
+  const relCount = joins.length;
+
+  schemaTree.innerHTML = cards.map(card => {
+    const tableName = card.querySelector('.thead-name')?.textContent.trim() || card.id;
+    const tableType = card.querySelector('.thead-type')?.textContent.trim() || '';
+    const cols = [...card.querySelectorAll('.tcol')].map(col => {
+      const key = col.querySelector('.pk-badge') ? 'PK' : col.querySelector('.fk-badge') ? 'FK' : '';
+      const name = col.querySelector('.col-name')?.textContent.trim() || '';
+      const type = col.querySelector('.col-type')?.textContent.trim() || '';
+      return `<li class="tree-col"><span class="k">${key || '•'}</span><span>${name} <span style="color:#9ca3af">${type}</span></span></li>`;
+    }).join('');
+    return `<li><details open><summary data-jump="${card.id}">${tableName} <span style="color:#6b7280;font-weight:500">(${tableType})</span></summary><ul>${cols}</ul></details></li>`;
+  }).join('');
+
+  treeMeta.textContent = `${tableCount} tables · ${colCount} columns`;
+  const sTables = document.getElementById('stat-tables');
+  const sCols = document.getElementById('stat-columns');
+  const sRels = document.getElementById('stat-relationships');
+  if (sTables) sTables.textContent = String(tableCount);
+  if (sCols) sCols.textContent = String(colCount);
+  if (sRels) sRels.textContent = String(relCount);
+
+  schemaTree.querySelectorAll('[data-jump]').forEach(node => {
+    node.addEventListener('click', () => {
+      const target = document.getElementById(node.dataset.jump);
+      if (!target) return;
+      selectedTableId = target.id;
+      document.querySelectorAll('.tcard').forEach(c => c.classList.toggle('selected', c.id === selectedTableId));
+      target.scrollIntoView({ behavior:'smooth', block:'center', inline:'center' });
+    });
+  });
+}
+
+function applyEditModeState(scope = document) {
+  scope.querySelectorAll('.thead-name,.thead-type,.col-name,.col-type,.col-note').forEach(el => {
+    el.setAttribute('contenteditable', editMode ? 'true' : 'false');
+    el.spellcheck = false;
+  });
+}
+
+function wireEditablePersistence() {
+  document.addEventListener('focusout', e => {
+    if (!e.target.matches('.thead-name,.thead-type,.col-name,.col-type,.col-note')) return;
+    refreshSchemaTree();
+    saveCustomTables();
+    saveSchemaEdits();
+    drawJoins();
+  });
+}
+
+function addColumnToSelected() {
+  if (!selectedTableId) {
+    alert('Select a table first, then use + Column.');
+    return;
+  }
+  const card = document.getElementById(selectedTableId);
+  if (!card) return;
+  const colName = prompt('Column name?', 'new_column');
+  if (!colName) return;
+  const colType = prompt('Column type?', 'VARCHAR');
+  if (!colType) return;
+  const key = (prompt('Key type? (PK/FK or leave blank)', '') || '').trim().toUpperCase();
+  const note = prompt('Short note (optional)', '') || '';
+  const row = document.createElement('div');
+  row.className = `tcol${key === 'PK' ? ' is-pk' : key === 'FK' ? ' is-fk' : ''}`;
+  row.innerHTML = `
+    <span class="col-key">${key === 'PK' ? '<span class="pk-badge">PK</span>' : key === 'FK' ? '<span class="fk-badge">FK</span>' : ''}</span>
+    <span class="col-name">${colName}</span>
+    <span class="col-type">${colType}</span>
+    ${note ? `<span class="col-note">${note}</span>` : ''}
+  `;
+  card.querySelector('.tcols')?.appendChild(row);
+  applyEditModeState(card);
+  refreshSchemaTree();
+  saveCustomTables();
+  saveSchemaEdits();
+  drawJoins();
+}
+
+function addNewTable() {
+  const nameInput = prompt('New table name?', 'fact_new_table');
+  if (!nameInput) return;
+  const id = slugify(nameInput);
+  if (document.getElementById(id)) {
+    alert('Table already exists. Use another name.');
+    return;
+  }
+  const kind = (prompt('Table group (dim/fact/event/camp/agg)', 'fact') || 'fact').trim().toLowerCase();
+  const mapKind = ['dim','fact','event','camp','agg'].includes(kind) ? kind : 'fact';
+  const table = createTableCard({
+    id,
+    kind: mapKind,
+    name: nameInput,
+    type: mapKind === 'dim' ? 'Dimension' : mapKind === 'agg' ? 'Aggregate' : 'Custom Table',
+    left: `${1140 + (Math.random()*160|0)}px`,
+    top: `${120 + (Math.random()*220|0)}px`,
+    columns: [
+      { key:'PK', name:'id', type:'VARCHAR', note:'primary identifier' },
+      { key:'', name:'created_at', type:'DATETIME', note:'' }
+    ]
+  });
+  selectedTableId = table.id;
+  document.querySelectorAll('.tcard').forEach(c => c.classList.toggle('selected', c.id === selectedTableId));
+  refreshSchemaTree();
+  saveCustomTables();
+  saveSchemaEdits();
+  drawJoins();
+}
+
 // ── TABLE DRAGGING ───────────────────────────────────────────────────────────
 const layoutKey = 'schema-table-layout-v1';
 const defaultPositions = {};
@@ -643,6 +946,7 @@ function saveLayout() {
     layout[card.id] = { left: card.style.left, top: card.style.top };
   });
   localStorage.setItem(layoutKey, JSON.stringify(layout));
+  saveCustomTables();
 }
 
 function applyLayout(layout) {
@@ -913,10 +1217,31 @@ function drawJoins() {
 
 // Wait for fonts + layout
 window.addEventListener('load', () => {
+  loadCustomTables();
+  document.querySelectorAll('.tcard').forEach(bindCardSelection);
+  loadSchemaEdits();
+  wireEditablePersistence();
+  applyEditModeState();
+
+  toggleEditBtn?.addEventListener('click', () => {
+    editMode = !editMode;
+    document.body.classList.toggle('edit-mode', editMode);
+    toggleEditBtn.classList.toggle('is-active', editMode);
+    toggleEditBtn.textContent = editMode ? 'Editing On' : 'Edit Mode';
+    applyEditModeState();
+    saveSchemaEdits();
+  });
+  addColumnBtn?.addEventListener('click', addColumnToSelected);
+  addTableBtn?.addEventListener('click', addNewTable);
+
   captureDefaultPositions();
   applyLayout(JSON.parse(localStorage.getItem(layoutKey) || 'null'));
   setupDragging();
-  setTimeout(drawJoins, 200);
+  refreshSchemaTree();
+  setTimeout(() => {
+    drawJoins();
+    refreshSchemaTree();
+  }, 200);
   window.addEventListener('resize', drawJoins);
 });
 </script>
